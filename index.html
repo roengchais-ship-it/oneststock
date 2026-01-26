@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบริหารจัดการสต็อก (Factory OS)</title>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+                    colors: {
+                        primary: '#4f46e5', secondary: '#64748b', success: '#10b981', warning: '#f59e0b', danger: '#ef4444', dark: '#0f172a'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f1f5f9; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .fade-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-item.active { background: rgba(255, 255, 255, 0.1); border-left: 4px solid #6366f1; color: white; }
+        .nav-item { border-left: 4px solid transparent; color: #94a3b8; }
+        .nav-item:hover { color: white; background: rgba(255, 255, 255, 0.05); }
+        .dashboard-card { transition: all 0.3s ease; }
+        .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .progress-bar-bg { background-color: #e2e8f0; border-radius: 9999px; height: 6px; width: 100%; overflow: hidden; }
+        .progress-bar-fill { height: 100%; border-radius: 9999px; transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="flex h-screen text-slate-800 antialiased overflow-hidden">
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center text-white">
+        <i class="fas fa-circle-notch fa-spin text-5xl text-primary mb-4"></i>
+        <h2 class="text-xl font-bold">กำลังเชื่อมต่อฐานข้อมูล Cloud...</h2>
+        <p class="text-slate-400 text-sm mt-2">กรุณารอสักครู่ (Realtime Sync)</p>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-900">
+            <div class="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center mr-3 shadow-lg">
+                <i class="fas fa-cubes"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-tight">Factory OS</h1>
+                <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-6 px-2">
+            <p class="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">เมนูหลัก</p>
+            <ul id="menu-list" class="space-y-1"></ul>
+        </nav>
+        <div class="p-4 border-t border-slate-800 bg-slate-900/50">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-slate-800">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-white truncate" id="current-user-name">Guest</p>
+                    <p class="text-xs text-indigo-400 font-medium truncate" id="current-user-role">Select Role</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9]">
+        <header class="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0 shadow-sm">
+            <div class="flex items-center gap-4">
+                <h2 class="text-xl font-bold text-slate-800" id="page-title">Dashboard</h2>
+                <span class="text-xs font-medium px-2 py-1 bg-green-50 text-green-600 rounded-md border border-green-100 hidden md:inline-block"><i class="fas fa-link mr-1"></i> เชื่อมต่อแล้ว (onsetstock)</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="h-6 w-px bg-slate-200"></div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase hidden sm:block">สลับบทบาท</span>
+                    <div class="relative">
+                        <select id="role-switcher" class="appearance-none bg-white border border-slate-300 text-slate-700 py-2 pl-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-bold shadow-sm hover:border-indigo-400">
+                            <option value="ADMIN">🔧 Admin</option>
+                            <option value="WAREHOUSE" selected>📦 Warehouse</option>
+                            <option value="QC">🛡️ QC</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><i class="fas fa-chevron-down text-xs"></i></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div id="content-area" class="flex-1 overflow-y-auto p-8 relative scroll-smooth"></div>
+    </main>
+
+    <!-- MODALS -->
+    <!-- Min Stock Modal -->
+    <div id="min-stock-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-bell mr-2"></i> ตั้งค่า Min Stock</h3></div>
+            <div class="p-6">
+                <input type="hidden" id="modal-item-id">
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2" id="modal-item-name">สินค้า</label>
+                    <input type="number" id="modal-min-stock-input" class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-3xl font-bold text-slate-700 focus:border-orange-400 outline-none" min="0">
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeModal('min-stock-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold">ยกเลิก</button>
+                    <button onclick="saveMinStockModal()" class="px-5 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-bold shadow-lg">บันทึก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div id="edit-item-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-edit mr-2"></i> แก้ไขข้อมูลสินค้า</h3></div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="edit-item-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัส (แก้ไขไม่ได้)</label><input type="text" id="edit-item-code" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 cursor-not-allowed" readonly></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Min Stock</label><input type="number" id="edit-item-min" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-bold" min="0"></div>
+                </div>
+                <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อสินค้า</label><input type="text" id="edit-item-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">ประเภท</label><select id="edit-item-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"><option value="RM">RM</option><option value="PKG">PKG</option><option value="FG">FG</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">หน่วย</label><select id="edit-item-unit" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button onclick="closeModal('edit-item-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold">ยกเลิก</button>
+                    <button onclick="saveEditItem()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-lg">บันทึก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT 1: STATE & UI HELPERS (Global) -->
+    <script>
+        // --- LOCAL STATE ---
+        window.localData = { items: [], stock: [], transactions: [] };
+        window.appState = {
+            currentUser: { name: 'สมชาย คลังสินค้า', role: 'WAREHOUSE' },
+            currentView: 'dashboard',
+            issueCart: [], issueRefDoc: '', issueDate: ''
+        };
+
+        // --- UI HELPERS ---
+        function renderSearchableItemInput(contextId) {
+            return `
+                <div class="relative group w-full" id="search-container-${contextId}">
+                    <div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all shadow-sm">
+                        <div class="bg-slate-50 px-3 py-2.5 border-r border-slate-200 text-slate-400"><i class="fas fa-search"></i></div>
+                        
+                        <input type="text" id="search-input-${contextId}" 
+                               class="w-full px-3 py-2.5 outline-none text-slate-700 placeholder-slate-400" 
+                               placeholder="พิมพ์รหัส SKU หรือ ชื่อสินค้า..." 
+                               autocomplete="off" 
+                               onfocus="openDropdown('${contextId}')" 
+                               oninput="handleSearchInput('${contextId}')"
+                               onblur="handleInputBlur('${contextId}')">
+                        
+                        <div id="clear-btn-${contextId}" class="hidden cursor-pointer px-3 text-slate-400 hover:text-danger transition-colors" onclick="clearSelection('${contextId}')"><i class="fas fa-times-circle"></i></div>
+                        <input type="hidden" name="itemId" id="hidden-item-id-${contextId}">
+                    </div>
+                    <div id="dropdown-list-${contextId}" class="hidden absolute z-50 w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in-down">${generateDropdownItems(contextId)}</div>
+                </div>`;
+        }
+
+        window.handleSearchInput = (cid) => {
+            document.getElementById('hidden-item-id-'+cid).value = ''; 
+            document.getElementById('clear-btn-'+cid).classList.remove('hidden');
+            const val = document.getElementById('search-input-'+cid).value;
+            document.getElementById('dropdown-list-'+cid).innerHTML = generateDropdownItems(cid, val);
+            document.getElementById('dropdown-list-'+cid).classList.remove('hidden');
+        };
+
+        window.handleInputBlur = (cid) => {
+            setTimeout(() => {
+                const hidden = document.getElementById('hidden-item-id-'+cid);
+                const input = document.getElementById('search-input-'+cid);
+                const list = document.getElementById('dropdown-list-'+cid);
+                const clearBtn = document.getElementById('clear-btn-'+cid);
+                if(list) list.classList.add('hidden');
+                if(hidden && !hidden.value && input) {
+                    input.value = ''; 
+                    if(clearBtn) clearBtn.classList.add('hidden');
+                }
+            }, 200);
+        };
+
+        function generateDropdownItems(contextId, filterText = '') {
+            const lowerFilter = filterText.toLowerCase();
+            const filtered = window.localData.items.filter(i => i.code.toLowerCase().includes(lowerFilter) || i.name.toLowerCase().includes(lowerFilter));
+            if (filtered.length === 0) return `<div class="p-4 text-slate-400 text-center text-sm">ไม่พบสินค้า "${filterText}"</div>`;
+            return filtered.map(item => `
+                <div class="cursor-pointer hover:bg-indigo-50 px-4 py-3 border-b border-slate-100 last:border-0 transition-colors group" onclick="selectDropdownItem('${contextId}', '${item.id}', '${item.code}', '${item.name}')">
+                    <div class="flex justify-between"><span class="font-bold text-indigo-600 font-mono">${item.code}</span><span class="text-xs bg-slate-200 px-2 rounded">${item.type}</span></div>
+                    <div class="text-sm text-slate-700">${item.name}</div>
+                </div>`).join('');
+        }
+
+        window.openDropdown = (cid) => { document.getElementById('dropdown-list-'+cid).innerHTML = generateDropdownItems(cid); document.getElementById('dropdown-list-'+cid).classList.remove('hidden'); };
+        window.selectDropdownItem = (cid, id, code, name) => { document.getElementById('hidden-item-id-'+cid).value = id; document.getElementById('search-input-'+cid).value = `${code} : ${name}`; document.getElementById('dropdown-list-'+cid).classList.add('hidden'); document.getElementById('clear-btn-'+cid).classList.remove('hidden'); };
+        window.clearSelection = (cid) => { document.getElementById('hidden-item-id-'+cid).value=''; document.getElementById('search-input-'+cid).value=''; document.getElementById('clear-btn-'+cid).classList.add('hidden'); };
+        
+        window.closeAllDropdowns = (e) => { 
+            if(!e.target.closest('[id^="search-container-"]')) {
+                document.querySelectorAll('[id^="dropdown-list-"]').forEach(el => el.classList.add('hidden'));
+            }
+        };
+        
+        window.alertSuccess = (m) => alert("✅ " + m); 
+        window.alertError = (m) => alert("❌ " + m);
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+    </script>
+
+    <!-- SCRIPT 2: FIREBASE MODULE -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // CONFIG (YOUR PROJECT: onsetstock)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAqOMC8fVaRMDB5aPpoImYSVFwjU1d_99k",
+            authDomain: "onsetstock.firebaseapp.com",
+            projectId: "onsetstock",
+            storageBucket: "onsetstock.firebasestorage.app",
+            messagingSenderId: "159241390751",
+            appId: "1:159241390751:web:58bef364f4678621ac70aa",
+            measurementId: "G-SKB9T0KMEP"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // FIXED: Static path for production/GitHub
+        const appId = 'factory-os-main'; 
+
+        // INIT APP
+        async function initApp() {
+            try {
+                await signInAnonymously(auth); 
+                const user = auth.currentUser;
+                if (!user) throw new Error("Auth failed");
+
+                const basePath = `artifacts/${appId}/public/data`;
+                
+                onSnapshot(collection(db, basePath, 'items'), (snap) => {
+                    window.localData.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    refreshViewIfActive();
+                });
+                onSnapshot(collection(db, basePath, 'stock'), (snap) => {
+                    window.localData.stock = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    refreshViewIfActive();
+                });
+                onSnapshot(collection(db, basePath, 'transactions'), (snap) => {
+                    const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    window.localData.transactions = txs.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    refreshViewIfActive();
+                });
+
+                document.getElementById('loading-screen').classList.add('hidden');
+                renderView('dashboard');
+                
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading-screen').innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Connection Error:<br>${e.message}</div>`;
+            }
+        }
+        
+        function refreshViewIfActive() { renderView(window.appState.currentView); }
+        initApp();
+
+        // --- EXPORTED ACTIONS ---
+        window.checkPerm = (action) => {
+            const role = window.appState.currentUser.role;
+            if (action === 'manage_item') return role === 'ADMIN' || role === 'WAREHOUSE'; 
+            return false;
+        };
+
+        window.createItem = async (formData) => {
+            if (!checkPerm('manage_item')) return alertError('ไม่มีสิทธิ์: เฉพาะ Admin หรือ Warehouse');
+            if(window.localData.items.find(i => i.code === formData.code)) return alertError('รหัสซ้ำ!');
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/data/items`), {
+                    code: formData.code.toUpperCase(), name: formData.name, type: formData.type, unit: formData.unit, minStock: parseInt(formData.minStock) || 0
+                });
+                alertSuccess('เพิ่มสินค้าสำเร็จ'); renderView('item-master');
+            } catch(e) { alertError(e.message); }
+        };
+
+        window.deleteItem = async (id) => {
+             if (checkPerm('manage_item') && confirm('ยืนยันลบ?')) {
+                 try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e) { alertError(e.message); }
+             }
+        };
+
+        window.saveEditItem = async () => {
+             if (!checkPerm('manage_item')) return;
+             const id = document.getElementById('edit-item-id').value;
+             try {
+                 await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), {
+                     name: document.getElementById('edit-item-name').value,
+                     type: document.getElementById('edit-item-type').value,
+                     unit: document.getElementById('edit-item-unit').value,
+                     minStock: parseInt(document.getElementById('edit-item-min').value)
+                 });
+                 closeModal('edit-item-modal');
+                 alertSuccess('แก้ไขเรียบร้อย');
+             } catch(e) { alertError(e.message); }
+        };
+
+        window.saveMinStockModal = async () => {
+             if (!checkPerm('manage_item')) return;
+             const id = document.getElementById('modal-item-id').value;
+             const val = parseInt(document.getElementById('modal-min-stock-input').value);
+             try {
+                 await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: val });
+                 closeModal('min-stock-modal');
+             } catch(e) { alertError(e.message); }
+        };
+
+        window.receiveItem = async (data) => {
+             const today = new Date().toISOString().split('T')[0];
+             try {
+                 await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), {
+                     itemId: data.itemId, lotNo: data.lotNo, qty: parseInt(data.qty), status: 'WAIT_QC',
+                     expDate: data.expDate, location: data.location, receivedDate: today
+                 });
+                 await logTransaction('RECEIVE', data.itemId, data.lotNo, parseInt(data.qty), `Location: ${data.location}`);
+                 alertSuccess('บันทึกรับของเรียบร้อย'); renderView('dashboard');
+             } catch(e) { alertError(e.message); }
+        };
+
+        window.qcAction = async (stockId, action, remark) => {
+             const stock = window.localData.stock.find(s => s.id === stockId);
+             if(!stock) return;
+             let newStatus = action === 'PASS' ? 'AVAILABLE' : 'REJECT';
+             if(action === 'HOLD') newStatus = 'HOLD';
+             try {
+                 await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockId), { status: newStatus });
+                 await logTransaction('QC_' + action, stock.itemId, stock.lotNo, 0, `${stock.status} -> ${newStatus} (${remark})`);
+                 alertSuccess('บันทึกผล QC เรียบร้อย');
+             } catch(e) { alertError(e.message); }
+        };
+
+        window.processIssueBatch = async () => {
+             if(window.appState.issueCart.length === 0) return alertError('ไม่มีรายการ');
+             if(!window.appState.issueRefDoc) return alertError('ระบุ Ref Doc');
+             if(!window.appState.issueDate) return alertError('ระบุวันที่');
+
+             try {
+                 for(let c of window.appState.issueCart) {
+                     const availableLots = window.localData.stock
+                        .filter(s => s.itemId === c.itemId && s.status === 'AVAILABLE' && s.qty > 0)
+                        .sort((a,b) => new Date(a.expDate) - new Date(b.expDate));
+                     let remaining = c.qty;
+                     for(let lot of availableLots) {
+                         if(remaining <= 0) break;
+                         let deduct = Math.min(lot.qty, remaining);
+                         await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, lot.id), { qty: lot.qty - deduct });
+                         await logTransaction('ISSUE', c.itemId, lot.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate);
+                         remaining -= deduct;
+                     }
+                     if(remaining > 0) alertError(`สินค้า ${c.item.code} ตัดได้ไม่ครบ (ขาด ${remaining})`);
+                 }
+                 window.appState.issueCart = []; window.appState.issueRefDoc = ''; alertSuccess('ตัดสต็อกเรียบร้อย'); renderView('dashboard');
+             } catch(e) { alertError(e.message); }
+        };
+
+        async function logTransaction(type, itemId, lotNo, qtyChange, note, customDate) {
+            const item = window.localData.items.find(i => i.id === itemId);
+            const itemName = item ? `${item.code} - ${item.name}` : 'Unknown';
+            const timestamp = customDate ? new Date(customDate).getTime() : Date.now();
+            const dateStr = customDate ? new Date(customDate).toLocaleString('th-TH') : new Date().toLocaleString('th-TH');
+            await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), {
+                type, itemId, item: itemName, lot: lotNo, qty: qtyChange,
+                actionBy: window.appState.currentUser.name + ` (${window.appState.currentUser.role})`,
+                note: note || '-', date: dateStr, timestamp: timestamp
+            });
+        }
+    </script>
+
+    <!-- SCRIPT 3: UI RENDERERS (Views) -->
+    <script>
+        // Handlers
+        function handleCreateItem(e) { e.preventDefault(); window.createItem(Object.fromEntries(new FormData(e.target))); }
+        function handleReceiveSubmit(e) { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); if(!d.itemId) return alertError("เลือกสินค้า"); const item = window.localData.items.find(i=>i.id==d.itemId); if(item && d.unit!==item.unit) return alertError("หน่วยผิด"); window.receiveItem(d); e.target.reset(); document.getElementById('search-input-receive-item').value = ''; }
+        function handleAddIssueItem() { 
+            const id=document.getElementById('hidden-item-id-issue-item').value; 
+            const qty=parseInt(document.getElementById('input-qty').value);
+            const unit=document.getElementById('input-unit').value; 
+            if(!id || !qty || !unit) return alertError('ข้อมูลไม่ครบ');
+            const item = window.localData.items.find(i=>i.id===id);
+            if(item.unit !== unit) return alertError('หน่วยนับผิด');
+            window.appState.issueCart.push({ itemId: id, item, qty, unit });
+            document.getElementById('input-qty').value = ''; document.getElementById('search-input-issue-item').value = '';
+            renderView('issue');
+        }
+        function removeFromIssueCart(idx) { window.appState.issueCart.splice(idx, 1); renderView('issue'); }
+        function openMinStockModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Warehouse'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('modal-item-id').value=id; document.getElementById('modal-item-name').innerText=`${i.code}: ${i.name}`; document.getElementById('modal-min-stock-input').value=i.minStock||0; document.getElementById('min-stock-modal').classList.remove('hidden'); setTimeout(() => { document.getElementById('modal-min-stock-input').select(); }, 100); };
+        function openEditItemModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Warehouse'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('edit-item-id').value = i.id; document.getElementById('edit-item-code').value = i.code; document.getElementById('edit-item-name').value = i.name; document.getElementById('edit-item-type').value = i.type; document.getElementById('edit-item-unit').value = i.unit; document.getElementById('edit-item-min').value = i.minStock || 0; document.getElementById('edit-item-modal').classList.remove('hidden'); };
+
+        // Renderers
+        const menuConfig = {
+            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
+            WAREHOUSE: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
+            QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'}]
+        };
+
+        window.renderView = (viewId) => {
+            window.appState.currentView = viewId;
+            const role = window.appState.currentUser.role;
+            document.getElementById('menu-list').innerHTML = (menuConfig[role]||[]).map(m => `
+                <li onclick="renderView('${m.id}')" class="nav-item ${viewId===m.id?'active':''} group flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 mx-2">
+                    <i class="fas ${m.i} w-6 text-center text-lg"></i><span class="font-medium text-sm">${m.l}</span>
+                </li>`).join('');
+            document.getElementById('current-user-role').innerText = role;
+            document.getElementById('current-user-name').innerText = window.appState.currentUser.name;
+
+            const content = document.getElementById('content-area');
+            if(viewId === 'dashboard') content.innerHTML = renderDashboard();
+            else if(viewId === 'inventory-status') content.innerHTML = renderInventoryStatus();
+            else if(viewId === 'item-master') content.innerHTML = renderItemMaster();
+            else if(viewId === 'receive') content.innerHTML = renderReceiveForm();
+            else if(viewId === 'qc-task') content.innerHTML = renderQCTask();
+            else if(viewId === 'issue') content.innerHTML = renderIssueForm();
+            else if(viewId === 'history') content.innerHTML = renderHistory();
+        };
+
+        function renderDashboard() {
+            let totalItem=window.localData.items.length, low=0, qc=0, avail=0;
+            window.localData.items.forEach(i => {
+                const stk = window.localData.stock.filter(s=>s.itemId===i.id);
+                const sum = stk.reduce((a,b)=>a+b.qty,0);
+                if(sum <= (i.minStock||0) && (i.minStock||0)>0) low++;
+            });
+            window.localData.stock.forEach(s => { 
+                if(s.status==='WAIT_QC') qc++; 
+                if(s.status==='AVAILABLE') avail++; 
+            });
+
+            return `<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                ${cardHtml('สินค้าทั้งหมด', totalItem, 'fa-boxes', 'text-slate-800', 'bg-indigo-50 text-indigo-600')}
+                ${cardHtml('สินค้าใกล้หมด', low, 'fa-exclamation-triangle', low>0?'text-red-600':'text-slate-800', low>0?'bg-red-50 text-red-500 animate-pulse':'bg-slate-50 text-slate-400')}
+                ${cardHtml('รอตรวจสอบ QC (Lot)', qc, 'fa-microscope', 'text-amber-500', 'bg-amber-50 text-amber-500')}
+                ${cardHtml('สินค้าพร้อมเบิก (Lot)', avail, 'fa-cubes', 'text-emerald-600', 'bg-emerald-50 text-emerald-600')}
+            </div>`;
+        }
+        function cardHtml(t, v, i, tc, ic) { return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2">${t}</p><h3 class="text-3xl font-bold ${tc}">${v.toLocaleString()}</h3></div><div class="p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`; }
+
+        function renderInventoryStatus() {
+            const input = document.getElementById('inventory-search');
+            let rows = window.localData.items.map(item => {
+                const stk = window.localData.stock.filter(s=>s.itemId===item.id);
+                const total = stk.reduce((a,b)=>a+b.qty,0);
+                const avail = stk.filter(s=>s.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0);
+                const wait = stk.filter(s=>s.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
+                const min = item.minStock || 0;
+                
+                const active = stk.filter(s=>s.qty>0);
+                let aging = '<span class="text-slate-300">-</span>';
+                if(active.length){
+                    const old = active.sort((a,b)=>new Date(a.receivedDate)-new Date(b.receivedDate))[0];
+                    if(old && old.receivedDate) {
+                        const days = Math.floor((new Date()-new Date(old.receivedDate))/(86400000));
+                        let c = days<=30 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100';
+                        aging = `<span class="px-2 py-0.5 rounded text-xs border ${c}">${days} วัน</span>`;
+                    }
+                }
+                const btnClass = checkPerm('manage_item') ? 'text-slate-400 hover:text-primary' : 'text-slate-200 cursor-not-allowed';
+                return `<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 item-row" data-search="${item.code.toLowerCase()} ${item.name.toLowerCase()}">
+                    <td class="py-3 px-6 font-bold text-indigo-600 font-mono">${item.code}</td><td class="py-3 px-6 text-slate-700">${item.name}</td>
+                    <td class="py-3 px-6 text-center text-xs"><span class="bg-slate-100 px-2 py-1 rounded">${item.type}</span></td>
+                    <td class="py-3 px-6 text-center text-slate-500">${min}</td><td class="py-3 px-6 text-center">${aging}</td>
+                    <td class="py-3 px-6 text-right font-bold ${total<=min&&min>0?'text-red-600':'text-slate-800'}">${total.toLocaleString()}</td>
+                    <td class="py-3 px-6 text-xs text-slate-400 uppercase">${item.unit}</td>
+                    <td class="py-3 px-6 text-right font-bold text-emerald-600">${avail.toLocaleString()}</td>
+                    <td class="py-3 px-6 text-right font-bold text-amber-500">${wait>0?wait:'-'}</td>
+                    <td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${item.id}')" class="${btnClass}"><i class="fas fa-cog"></i></button></td>
+                </tr>`;
+            }).join('');
+            
+            return `<div class="space-y-6 max-w-7xl mx-auto"><div class="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div><h3 class="font-bold text-xl text-slate-800 flex items-center gap-2"><i class="fas fa-boxes-stacked text-primary"></i> รายการสินค้าคงคลัง</h3><p class="text-slate-500 text-sm mt-1">จัดการสถานะสินค้า (${window.localData.items.length} รายการ)</p></div><div class="w-full md:w-auto"><div class="relative group w-full sm:w-64"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-slate-400"></i></div><input type="text" id="inventory-search" onkeyup="filterInventoryTable()" class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl bg-slate-50 focus:outline-none focus:bg-white focus:border-primary transition-all sm:text-sm" placeholder="ค้นหา SKU..."></div></div></div><div class="flex justify-end text-xs text-slate-500 gap-3"><span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-emerald-500"></div> ≤ 30 วัน</span><span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-red-500"></div> > 30 วัน</span></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[600px] flex flex-col"><div class="flex-1 overflow-auto custom-scrollbar"><table class="w-full text-sm text-left border-collapse" id="inventory-table"><thead class="bg-slate-50 text-slate-500 uppercase text-xs sticky top-0 z-10 shadow-sm"><tr><th class="py-4 px-6">รหัส</th><th class="py-4 px-6">ชื่อ</th><th class="py-4 px-6 text-center">ประเภท</th><th class="py-4 px-6 text-center">Min</th><th class="py-4 px-6 text-center">Aging</th><th class="py-4 px-6 text-right">คงเหลือ</th><th class="py-4 px-6">หน่วย</th><th class="py-4 px-6 text-right">พร้อมใช้</th><th class="py-4 px-6 text-right">รอ QC</th><th class="py-4 px-6 text-center">ตั้งค่า</th></tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div></div></div>`;
+        }
+        
+        window.filterInventoryTable = () => {
+            const input = document.getElementById('inventory-search');
+            if(!input) return;
+            const filter = input.value.toLowerCase();
+            const rows = document.querySelectorAll('#inventory-table .item-row');
+            rows.forEach(row => {
+                const text = row.getAttribute('data-search');
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        };
+
+        function renderItemMaster() {
+            const canManage = checkPerm('manage_item');
+            const form = canManage ? `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-24"><h3 class="font-bold mb-4 flex items-center text-slate-800"><i class="fas fa-plus-circle text-primary mr-2"></i> สร้างสินค้าใหม่</h3><form onsubmit="handleCreateItem(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500 uppercase">รหัสสินค้า</label><input name="code" class="w-full border p-2 rounded-lg font-mono" placeholder="Ex. RM-001" required></div><div><label class="text-xs font-bold text-slate-500 uppercase">ชื่อสินค้า</label><input name="name" class="w-full border p-2 rounded-lg" required></div><div class="grid grid-cols-2 gap-2"><div><label class="text-xs font-bold text-slate-500 uppercase">ประเภท</label><select name="type" class="w-full border p-2 rounded-lg bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div><div><label class="text-xs font-bold text-slate-500 uppercase">หน่วย</label><select name="unit" class="w-full border p-2 rounded-lg bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div></div><div><label class="text-xs font-bold text-slate-500 uppercase">Min Stock</label><input type="number" name="minStock" class="w-full border p-2 rounded-lg" value="0"></div><button class="w-full bg-primary hover:bg-indigo-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all">บันทึกสินค้า</button></form></div>` 
+            : `<div class="bg-slate-50 p-8 rounded-2xl text-center border border-slate-200"><i class="fas fa-lock text-4xl text-slate-300 mb-3"></i><h3 class="text-slate-600 font-bold">จำกัดสิทธิ์</h3><p class="text-slate-400 text-sm">เฉพาะ Admin หรือ Warehouse เท่านั้นที่เพิ่มสินค้าได้</p></div>`;
+            
+            const list = window.localData.items.map(i => `<tr class="border-b border-slate-100 hover:bg-slate-50 group transition-colors"><td class="py-3 px-4 font-bold text-primary font-mono">${i.code}</td><td class="py-3 px-4 text-slate-700">${i.name}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 px-2 rounded text-xs font-bold text-slate-500">${i.type}</span></td><td class="py-3 px-4 text-center text-slate-500">${i.unit}</td><td class="py-3 px-4 text-center">${canManage ? `<button onclick="openEditItemModal('${i.id}')" class="text-slate-400 hover:text-blue-500 mr-2 p-1 transition-colors"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-400 hover:text-red-500 p-1 transition-colors"><i class="fas fa-trash-alt"></i></button>`:'<i class="fas fa-lock text-slate-200"></i>'}</td></tr>`).join('');
+            
+            return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">${form}<div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50"><h3 class="font-bold text-slate-700">รายการสินค้า (Product List)</h3></div><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs"><tr><th class="py-3 px-4">รหัส</th><th class="py-3 px-4">ชื่อ</th><th class="py-3 px-4 text-center">ประเภท</th><th class="py-3 px-4 text-center">หน่วย</th><th class="py-3 px-4 text-center">จัดการ</th></tr></thead><tbody class="divide-y divide-slate-100">${list}</tbody></table></div></div>`;
+        }
+
+        function renderReceiveForm() { return document.getElementById('search-container-receive-item') ? '' : `<div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-xl font-bold mb-6 text-slate-800 border-b border-slate-100 pb-4"><i class="fas fa-dolly text-primary mr-2"></i> บันทึกรับของเข้า (GR)</h3><form onsubmit="handleReceiveSubmit(event)" class="space-y-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">เลือกสินค้า</label>${renderSearchableItemInput('receive-item')}</div><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Lot No.</label><input name="lotNo" class="w-full border-slate-300 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">จำนวน</label><input type="number" name="qty" class="w-full border-slate-300 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none" required></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">หน่วย</label><select name="unit" class="w-full border-slate-300 border p-3 rounded-xl bg-white" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option></select></div></div></div><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-300 border p-3 rounded-xl" required></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Location</label><input name="location" class="w-full border-slate-300 border p-3 rounded-xl" required></div></div><button class="w-full bg-slate-800 hover:bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg transition-all">บันทึกรับของ</button></form></div>`; }
+        function renderQCTask() { const tasks = window.localData.stock.filter(s=>s.status==='WAIT_QC'); if(!tasks.length) return `<div class="text-center py-20 text-slate-400 flex flex-col items-center"><i class="fas fa-check-circle text-4xl text-emerald-200 mb-4"></i><p>ไม่มีงานรอตรวจสอบคุณภาพ</p></div>`; return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${tasks.map(s=>{ const i=window.localData.items.find(x=>x.id===s.itemId); return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all"><div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div><div class="flex justify-between mb-3 pl-3"><div><span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-bold">WAIT QC</span><h4 class="font-bold text-slate-800 mt-1">${i.code}</h4><p class="text-sm text-slate-500">${i.name}</p></div><div class="text-right"><span class="text-[10px] text-slate-400 uppercase font-bold">Exp Date</span><p class="text-xs font-bold text-red-500">${s.expDate}</p></div></div><div class="bg-slate-50 rounded-xl p-3 mb-4 text-sm mx-3"><div class="flex justify-between mb-1"><span class="text-slate-500">Lot</span><span class="font-mono font-bold">${s.lotNo}</span></div><div class="flex justify-between"><span class="text-slate-500">Qty</span><span class="font-bold text-slate-800">${s.qty} ${i.unit}</span></div></div><div class="flex gap-2 pl-3"><button onclick="qcAction('${s.id}','PASS','OK')" class="flex-1 border border-slate-200 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 py-2 rounded-lg text-sm font-bold transition-all">Pass</button><button onclick="qcAction('${s.id}','FAIL','NG')" class="flex-1 border border-slate-200 hover:bg-red-500 hover:text-white hover:border-red-500 py-2 rounded-lg text-sm font-bold transition-all">Reject</button></div></div>` }).join('')}</div>`; }
+        function renderIssueForm() { if(!window.appState.issueDate) window.appState.issueDate=new Date().toISOString().slice(0,16); const list=window.appState.issueCart.map((c,i)=>`<tr class="border-b border-slate-100 last:border-0"><td class="p-3 text-slate-400 font-mono text-xs">${i+1}</td><td class="p-3 font-bold text-primary">${c.item.code}</td><td class="p-3 text-slate-700">${c.item.name}</td><td class="p-3 text-right font-bold">${c.qty}</td><td class="p-3 text-center text-xs text-slate-400 uppercase">${c.item.unit}</td><td class="p-3 text-center"><button onclick="removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-times-circle text-lg"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto space-y-6"><div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">รายละเอียดการเบิก (Issue Details)</h3><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Ref Doc / Job No.</label><input id="input-ref-doc" class="w-full border-slate-300 border p-3 rounded-xl font-bold text-slate-800" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value" placeholder="เช่น JOB-001"></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Date</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-300 border p-3 rounded-xl" value="${window.appState.issueDate}" onchange="window.appState.issueDate=this.value"></div></div></div><div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-inner"><div class="flex flex-col md:flex-row gap-4 items-end"><div class="flex-grow w-full"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">ค้นหาสินค้า</label>${renderSearchableItemInput('issue-item')}</div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">จำนวน</label><input type="number" id="input-qty" class="w-full border-slate-300 border p-2.5 rounded-xl text-center font-bold" placeholder="0"></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">หน่วย</label><select id="input-unit" class="w-full border-slate-300 border p-2.5 rounded-xl bg-white"><option value="">-</option><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div><button onclick="handleAddIssueItem()" class="w-full md:w-auto bg-primary hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all">เพิ่มรายการ</button></div></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="px-6 py-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-600">รายการที่เลือก (${window.appState.issueCart.length})</div><table class="w-full text-sm text-left"><thead class="bg-white text-slate-500 border-b border-slate-100"><tr><th class="p-3 pl-4">#</th><th class="p-3">รหัส</th><th class="p-3">ชื่อ</th><th class="p-3 text-right">จำนวน</th><th class="p-3 text-center">หน่วย</th><th></th></tr></thead><tbody>${window.appState.issueCart.length > 0 ? list : '<tr><td colspan="6" class="py-10 text-center text-slate-400 italic">ยังไม่มีรายการสินค้า</td></tr>'}</tbody></table><div class="p-6 bg-slate-50 border-t border-slate-200 text-right"><button onclick="processIssueBatch()" class="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform active:scale-95" ${window.appState.issueCart.length === 0 ? 'disabled class="opacity-50 cursor-not-allowed bg-slate-800 text-white px-8 py-3 rounded-xl font-bold"' : ''}>ยืนยันการเบิกสินค้า</button></div></div></div>`; }
+        function renderHistory() { return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs"><tr><th class="p-4 pl-6">เวลา</th><th class="p-4">ประเภท</th><th class="p-4">สินค้า</th><th class="p-4">Lot</th><th class="p-4 text-right">จำนวน</th><th class="p-4">โดย</th><th class="p-4 pr-6">Note</th></tr></thead><tbody class="divide-y divide-slate-100">${window.localData.transactions.map(t=>`<tr class="hover:bg-slate-50 border-b last:border-0 transition-colors"><td class="p-3 pl-6 text-xs text-slate-500 font-mono">${t.date.split(' ')[1]}</td><td class="p-3 font-bold text-xs ${t.type.includes('RECEIVE')?'text-emerald-600':t.type.includes('ISS')?'text-primary':'text-amber-500'}">${t.type}</td><td class="p-3 text-slate-700 font-medium">${t.item}</td><td class="p-3 font-mono text-xs"><span class="bg-slate-100 px-2 py-1 rounded text-slate-600">${t.lot}</span></td><td class="p-3 text-right font-bold text-slate-800">${t.qty}</td><td class="p-3 text-xs text-slate-500 flex items-center gap-2"><div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[10px]">${t.actionBy.charAt(0)}</div>${t.actionBy.split(' ')[0]}</td><td class="p-3 pr-6 text-xs text-slate-400 italic">${t.note}</td></tr>`).join('')}</tbody></table></div>`; }
+        
+        document.getElementById('role-switcher').addEventListener('change', (e) => { 
+            const r = e.target.value; 
+            window.appState.currentUser = { name: r==='ADMIN'?'Admin':r==='QC'?'QC User':'Warehouse User', role: r }; 
+            renderView('dashboard'); 
+        });
+
+    </script>
+</body>
+</html>
