@@ -43,7 +43,6 @@
         .dropdown-item { transition: all 0.2s ease; }
         .dropdown-item:active { background-color: #e0e7ff; }
         
-        /* สไตล์ฟิลเตอร์ Segmented Control */
         .segmented-control { background: #f8fafc; border: 1px solid #e2e8f0; padding: 4px; border-radius: 12px; display: flex; gap: 2px; }
         .segmented-item { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; color: #64748b; border: 1px solid transparent; }
         .segmented-item:hover:not(.active) { background: #fff; color: #4f46e5; border-color: #f1f5f9; }
@@ -96,21 +95,6 @@
                 </div>
             </form>
             <div id="login-error" class="text-center text-xs text-red-500 mt-4 hidden"></div>
-            
-            <div class="mt-6 border-t border-slate-100 pt-4">
-                <p class="text-center text-xs font-bold text-slate-400 mb-2">บัญชีทดสอบ (Default Accounts)</p>
-                <div class="grid grid-cols-3 gap-2 text-[10px] text-slate-500 text-center">
-                    <div class="bg-slate-50 p-2 rounded border">
-                        <b>admin</b> : 1234<br>(Admin)
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded border">
-                        <b>stock</b> : 1234<br>(Stock)
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded border">
-                        <b>qc</b> : 1234<br>(QC)
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -132,7 +116,6 @@
                 <p class="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">เมนูหลัก</p>
                 <ul id="menu-list" class="space-y-1"></ul>
             </nav>
-            <!-- Fixed: Explicit onclick for openProfileModal -->
             <div class="p-4 border-t border-slate-800 bg-slate-900/50 cursor-pointer hover:bg-slate-800 transition-colors" onclick="window.openProfileModal()">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-slate-800">
@@ -284,14 +267,146 @@
         window.alertSuccess = (m) => alert("✅ " + m); 
         window.alertError = (m) => alert("❌ " + m);
 
-        // UNIT CONVERSION HELPER
+        // --- UPDATED: PRINT PDF WITH 0.5cm MARGINS ---
+        window.printStockCheckSheet = function() {
+            const currentFilter = window.appState.inventoryFilter;
+            const isLowOnly = window.appState.inventoryLowStockOnly;
+            
+            let filtered = window.localData.items;
+            if (currentFilter !== 'ALL') filtered = filtered.filter(i => i.type === currentFilter);
+            
+            const printData = filtered.map(i => {
+                const s = window.localData.stock.filter(x => String(x.itemId) === String(i.id));
+                const tot = s.reduce((a, b) => a + b.qty, 0);
+                const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
+                if (isLowOnly && !isLow) return null;
+                return { code: i.code, name: i.name, balance: tot.toFixed(2), unit: i.unit };
+            }).filter(x => x !== null);
+
+            if (printData.length === 0) return alertError("ไม่มีข้อมูลสำหรับพิมพ์");
+
+            const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            const html = `
+                <div class="print-container">
+                    <div class="header">
+                        <h1>แบบฟอร์มตรวจนับสินค้าประจำงวด</h1>
+                        <p>ข้อมูล ณ วันที่: ${today} | ประเภทสินค้า: ${currentFilter}</p>
+                    </div>
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>รหัสสินค้า</th>
+                                <th style="text-align: left;">ชื่อสินค้า</th>
+                                <th>ยอดในระบบ</th>
+                                <th>หน่วย</th>
+                                <th>นับจริง</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${printData.map(item => `
+                                <tr>
+                                    <td class="font-mono text-center">${item.code}</td>
+                                    <td>${item.name}</td>
+                                    <td class="text-center">${item.balance}</td>
+                                    <td class="text-center">${item.unit}</td>
+                                    <td class="check-box"></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="footer">
+                        <div class="sig-box">
+                            <p>__________________________</p>
+                            <p>( ผู้ตรวจนับ )</p>
+                        </div>
+                        <div class="sig-box">
+                            <p>__________________________</p>
+                            <p>( ผู้รับรอง/Admin )</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>พิมพ์ใบตรวจนับสต็อก</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+                    <style>
+                        @page {
+                            size: A4;
+                            margin: 0.5cm; /* ปรับขอบเป็น 0.5 ซม. ตามที่ต้องการ */
+                        }
+                        body {
+                            font-family: 'Sarabun', sans-serif;
+                            margin: 0;
+                            padding: 0;
+                            color: #333;
+                            font-size: 12px;
+                        }
+                        .print-container {
+                            padding: 10px;
+                        }
+                        .header {
+                            text-align: center;
+                            margin-bottom: 15px;
+                            border-bottom: 2px solid #000;
+                            padding-bottom: 10px;
+                        }
+                        .header h1 { margin: 0; font-size: 20px; }
+                        .header p { margin: 5px 0; font-size: 12px; color: #555; }
+                        .print-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 20px;
+                        }
+                        .print-table th, .print-table td {
+                            border: 1px solid #000;
+                            padding: 6px 4px;
+                        }
+                        .print-table th {
+                            background-color: #f5f5f5 !important;
+                            font-weight: bold;
+                            text-align: center;
+                        }
+                        .text-center { text-align: center; }
+                        .font-mono { font-family: monospace; }
+                        .check-box { width: 100px; }
+                        .footer {
+                            margin-top: 30px;
+                            display: flex;
+                            justify-content: space-around;
+                        }
+                        .sig-box { text-align: center; }
+                        @media print {
+                            .header { -webkit-print-color-adjust: exact; }
+                            th { background-color: #f5f5f5 !important; -webkit-print-color-adjust: exact; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${html}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            
+            printWindow.onload = function() {
+                setTimeout(() => {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
+            };
+        };
+
         window.getConversionFactor = (from, to) => {
             if (from === to) return 1;
             const units = { 'kg_g': 1/1000, 'g_kg': 1000, 'l_ml': 1000, 'ml_l': 1/1000 };
             return units[`${to}_${from}`] || 1; 
         };
 
-        // UI HELPERS
         function renderSearchableItemInput(cid) { 
             return `
                 <div class="relative group w-full" id="search-container-${cid}">
@@ -346,7 +461,6 @@
             document.getElementById('clear-btn-'+cid).classList.add('hidden'); 
         };
 
-        // AUTH HANDLERS
         window.handleLogin = (e) => {
             e.preventDefault();
             const d = new FormData(e.target);
@@ -419,7 +533,6 @@
         function refreshView() { if(window.appState.currentUser) renderView(window.appState.currentView); }
         initApp();
 
-        // ACTIONS
         window.createItem = async (d) => { try { await addDoc(collection(db, `artifacts/${appId}/public/data/items`), { code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); alertSuccess('สำเร็จ'); renderView('item-master'); } catch(e){alertError(e.message)} };
         window.deleteItem = async (id) => { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e){alertError(e.message)} };
         window.saveEditItem = async () => { const id=document.getElementById('edit-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) }); closeModal('edit-item-modal'); alertSuccess('แก้ไขแล้ว'); } catch(e){alertError(e.message)} };
@@ -502,7 +615,6 @@
             document.getElementById('current-user-name').innerText = user.name;
             document.getElementById('topbar-user-name').innerText = user.name;
             document.getElementById('topbar-user-role').innerText = user.role;
-
             const content = document.getElementById('content-area');
             if(viewId==='dashboard') content.innerHTML=renderDashboard();
             else if(viewId==='inventory-status') content.innerHTML=renderInventoryStatus();
@@ -524,7 +636,6 @@
             window.localData.stock.forEach(s=>{ if(s.qty>0){ const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(it){ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; } } });
             const recentTrans = window.localData.transactions.slice(0, 5);
             const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
-
             return `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     ${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}
@@ -562,7 +673,6 @@
             const currentFilter = window.appState.inventoryFilter, isLowStockOnly = window.appState.inventoryLowStockOnly;
             let filteredItems = window.localData.items;
             if (currentFilter !== 'ALL') filteredItems = filteredItems.filter(i => i.type === currentFilter);
-            
             const rows = filteredItems.map(i => {
                 const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), tot=s.reduce((a,b)=>a+b.qty,0), av=s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0), qc=s.filter(x=>x.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
                 const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
@@ -572,10 +682,8 @@
                 const cls = checkPerm('manage_item')?'text-slate-400 hover:text-primary':'text-slate-200 cursor-not-allowed';
                 return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row" data-search="${i.code.toLowerCase()} ${i.name.toLowerCase()}"><td class="py-3 px-6 text-center font-bold text-indigo-600 font-mono">${i.code}</td><td class="py-3 px-6 text-center text-slate-700">${i.name}</td><td class="py-3 px-6 text-center text-xs"><span class="bg-slate-100 px-2 py-1 rounded">${i.type}</span></td><td class="py-3 px-6 text-center">${i.minStock||0}</td><td class="py-3 px-6 text-center">${ag}</td><td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center text-xs text-slate-400 uppercase">${i.unit}</td><td class="py-3 px-6 text-center font-bold text-emerald-600">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center font-bold text-amber-500">${qc>0?qc.toLocaleString():'-'}</td><td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${i.id}')" class="${cls}"><i class="fas fa-cog"></i></button></td></tr>`;
             }).filter(row => row !== null).join('');
-
             const getCount = (type) => window.localData.items.filter(i => type === 'ALL' || i.type === type).length;
             const lowStockCount = window.localData.items.filter(i => { const tot = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)).reduce((a,b)=>a+b.qty,0); return tot <= (i.minStock || 0) && (i.minStock || 0) > 0; }).length;
-
             return `
                 <div class="space-y-6 max-w-7xl mx-auto">
                     <div class="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-6">
@@ -598,29 +706,17 @@
                             <button onclick="toggleLowStockFilter()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all ${isLowStockOnly?'bg-red-500 text-white border-red-500 shadow-lg shadow-red-200':'bg-white text-red-600 border-red-100 hover:border-red-200 hover:bg-red-50'}">
                                 <i class="fas fa-triangle-exclamation"></i> สินค้าใกล้หมด <span class="${isLowStockOnly?'bg-white/20 text-white':'bg-red-100 text-red-600'} px-2 py-0.5 rounded-md text-[10px]">${lowStockCount}</span>
                             </button>
+                            <div class="h-8 w-px bg-slate-200 mx-1"></div>
+                            <button onclick="window.printStockCheckSheet()" class="flex items-center gap-2 bg-white hover:bg-red-50 text-red-600 border border-red-200 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all transform active:scale-95">
+                                <i class="fas fa-file-pdf text-lg"></i> พิมพ์ใบตรวจนับ (PDF)
+                            </button>
                         </div>
                     </div>
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input id="inventory-search" onkeyup="filterInventoryTable()" class="w-full border-slate-200 border pl-11 pr-4 py-3.5 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ค้นหาชื่อหรือรหัสสินค้าในคลัง...">
-                    </div>
+                    <div class="relative"><i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="inventory-search" onkeyup="filterInventoryTable()" class="w-full border-slate-200 border pl-11 pr-4 py-3.5 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ค้นหาชื่อหรือรหัสสินค้าในคลัง..."></div>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[500px] flex flex-col">
                         <div class="flex-1 overflow-auto custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse" id="inventory-table">
-                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10">
-                                    <tr>
-                                        <th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th>
-                                        <th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">Min</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">Aging</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">คงเหลือ</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">หน่วย</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">พร้อมใช้</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">รอ QC</th>
-                                        <th class="text-center font-bold text-slate-500 uppercase text-[11px]">ตั้งค่า</th>
-                                    </tr>
-                                </thead>
+                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10"><tr><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">Min</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">Aging</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">คงเหลือ</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">หน่วย</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">พร้อมใช้</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">รอ QC</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ตั้งค่า</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                             ${rows === '' ? '<div class="p-20 text-center flex flex-col items-center gap-3"><i class="fas fa-magnifying-glass text-4xl text-slate-200"></i><p class="text-slate-400 italic">ไม่พบข้อมูลสินค้าที่คุณกำลังค้นหา</p></div>' : ''}
