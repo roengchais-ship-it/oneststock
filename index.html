@@ -39,85 +39,199 @@
         .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         .progress-bar-bg { background-color: #e2e8f0; border-radius: 9999px; height: 6px; width: 100%; overflow: hidden; }
         .progress-bar-fill { height: 100%; border-radius: 9999px; transition: width 0.5s ease; }
+        .login-bg { background-image: linear-gradient(135deg, #4f46e5 0%, #0f172a 100%); }
     </style>
 </head>
-<body class="flex h-screen text-slate-800 antialiased overflow-hidden">
+<body class="text-slate-800 antialiased overflow-hidden h-screen w-screen relative">
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center text-white">
+    <!-- 1. LOADING SCREEN -->
+    <div id="loading-screen" class="fixed inset-0 bg-slate-900 z-[60] flex flex-col items-center justify-center text-white transition-opacity duration-500">
         <i class="fas fa-circle-notch fa-spin text-5xl text-primary mb-4"></i>
         <h2 class="text-xl font-bold">กำลังเชื่อมต่อฐานข้อมูล Cloud...</h2>
-        <p class="text-slate-400 text-sm mt-2">กรุณารอสักครู่ (Realtime Sync)</p>
+        <p class="text-slate-400 text-sm mt-2">ตรวจสอบสิทธิ์การเข้าถึง</p>
     </div>
 
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
-        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-900">
-            <div class="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center mr-3 shadow-lg">
-                <i class="fas fa-cubes"></i>
-            </div>
-            <div>
-                <h1 class="font-bold text-lg tracking-tight">Factory OS</h1>
-                <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
-            </div>
-        </div>
-        <nav class="flex-1 overflow-y-auto py-6 px-2">
-            <p class="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">เมนูหลัก</p>
-            <ul id="menu-list" class="space-y-1"></ul>
-        </nav>
-        <div class="p-4 border-t border-slate-800 bg-slate-900/50">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-slate-800">
-                    <i class="fas fa-user"></i>
+    <!-- 2. LOGIN SCREEN -->
+    <div id="login-view" class="fixed inset-0 z-50 flex items-center justify-center login-bg hidden">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 m-4 fade-in">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-primary text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg shadow-indigo-500/30">
+                    <i class="fas fa-cubes"></i>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold text-white truncate" id="current-user-name">Guest</p>
-                    <p class="text-xs text-indigo-400 font-medium truncate" id="current-user-role">Select Role</p>
-                </div>
+                <h1 class="text-2xl font-bold text-slate-800">Factory OS</h1>
+                <p class="text-slate-500 text-sm">เข้าสู่ระบบเพื่อใช้งาน</p>
             </div>
-        </div>
-    </aside>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9]">
-        <header class="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0 shadow-sm">
-            <div class="flex items-center gap-4">
-                <h2 class="text-xl font-bold text-slate-800" id="page-title">Dashboard</h2>
-                <span class="text-xs font-medium px-2 py-1 bg-green-50 text-green-600 rounded-md border border-green-100 hidden md:inline-block"><i class="fas fa-link mr-1"></i> เชื่อมต่อแล้ว (onsetstock)</span>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="h-6 w-px bg-slate-200"></div>
-                <div class="flex items-center gap-3">
-                    <span class="text-xs font-bold text-slate-400 uppercase hidden sm:block">สลับบทบาท</span>
+            <form onsubmit="handleLogin(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-slate-600 mb-2">ชื่อผู้ใช้งาน (Username)</label>
                     <div class="relative">
-                        <select id="role-switcher" class="appearance-none bg-white border border-slate-300 text-slate-700 py-2 pl-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-bold shadow-sm hover:border-indigo-400">
-                            <option value="ADMIN">🔧 Admin</option>
-                            <option value="WAREHOUSE" selected>📦 Warehouse</option>
-                            <option value="QC">🛡️ QC</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><i class="fas fa-chevron-down text-xs"></i></div>
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fas fa-user"></i></span>
+                        <input type="text" name="username" class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="Username" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-600 mb-2">รหัสผ่าน (Password)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fas fa-key"></i></span>
+                        <input type="password" name="password" class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="Password" required>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        เข้าสู่ระบบ <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </form>
+            <div id="login-error" class="text-center text-xs text-red-500 mt-4 hidden"></div>
+            
+            <div class="mt-6 border-t border-slate-100 pt-4">
+                <p class="text-center text-xs font-bold text-slate-400 mb-2">บัญชีทดสอบ (Default Accounts)</p>
+                <div class="grid grid-cols-3 gap-2 text-[10px] text-slate-500 text-center">
+                    <div class="bg-slate-50 p-2 rounded border">
+                        <b>admin</b> : 1234<br>(Admin)
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border">
+                        <b>stock</b> : 1234<br>(Stock)
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border">
+                        <b>qc</b> : 1234<br>(QC)
                     </div>
                 </div>
             </div>
-        </header>
-        <div id="content-area" class="flex-1 overflow-y-auto p-8 relative scroll-smooth"></div>
-    </main>
+        </div>
+    </div>
+
+    <!-- 3. MAIN APP LAYOUT -->
+    <div id="app-layout" class="flex h-screen w-full hidden opacity-0 transition-opacity duration-300">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
+            <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-900">
+                <div class="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center mr-3 shadow-lg">
+                    <i class="fas fa-cubes"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight">Factory OS</h1>
+                    <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
+                </div>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-6 px-2">
+                <p class="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">เมนูหลัก</p>
+                <ul id="menu-list" class="space-y-1"></ul>
+            </nav>
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50 cursor-pointer hover:bg-slate-800 transition-colors" onclick="openProfileModal()">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-slate-800">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-white truncate" id="current-user-name">Guest</p>
+                        <p class="text-xs text-indigo-400 font-medium truncate" id="current-user-role">Role</p>
+                    </div>
+                    <i class="fas fa-cog text-slate-500 text-xs"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9]">
+            <header class="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-xl font-bold text-slate-800" id="page-title">Dashboard</h2>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-bold text-slate-700 leading-tight" id="topbar-user-name">User</p>
+                        <span class="text-[10px] bg-indigo-50 text-primary px-2 py-0.5 rounded border border-indigo-100 uppercase" id="topbar-user-role">Role</span>
+                    </div>
+                    <div class="h-8 w-px bg-slate-200 mx-2"></div>
+                    <button onclick="logout()" class="text-slate-400 hover:text-red-500 transition-colors p-2" title="ออกจากระบบ">
+                        <i class="fas fa-sign-out-alt text-lg"></i>
+                    </button>
+                </div>
+            </header>
+            <div id="content-area" class="flex-1 overflow-y-auto p-8 relative scroll-smooth"></div>
+        </main>
+    </div>
 
     <!-- MODALS -->
+    
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-slate-700 to-slate-900 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white"><i class="fas fa-user-circle mr-2"></i> โปรไฟล์ของฉัน</h3>
+                <button onclick="closeModal('profile-modal')" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="profile-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อผู้ใช้งาน (Username)</label>
+                    <input type="text" id="profile-username" class="w-full border p-2 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อที่แสดง (Display Name)</label>
+                    <input type="text" id="profile-name" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัสผ่านใหม่ (ว่างไว้ถ้าไม่เปลี่ยน)</label>
+                    <input type="password" id="profile-password" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" placeholder="New Password">
+                </div>
+                <div class="pt-2">
+                    <button onclick="saveProfile()" class="w-full bg-primary hover:bg-indigo-700 text-white py-2 rounded-lg font-bold shadow transition-all">บันทึกการเปลี่ยนแปลง</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal (Admin Only) -->
+    <div id="user-manage-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white"><i class="fas fa-users-cog mr-2"></i> เพิ่มผู้ใช้งานใหม่</h3>
+                <button onclick="closeModal('user-manage-modal')" class="text-blue-200 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form onsubmit="handleCreateUser(event)" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Username</label>
+                        <input type="text" name="new_username" class="w-full border p-2 rounded-lg" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                        <input type="text" name="new_password" class="w-full border p-2 rounded-lg" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อพนักงาน</label>
+                    <input type="text" name="new_name" class="w-full border p-2 rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ตำแหน่ง (Role)</label>
+                    <select name="new_role" class="w-full border p-2 rounded-lg bg-white">
+                        <option value="STOCK">Stock</option>
+                        <option value="QC">QC</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold shadow">สร้างผู้ใช้</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Min Stock Modal -->
     <div id="min-stock-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
         <div class="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-bell mr-2"></i> ตั้งค่า Min Stock</h3></div>
             <div class="p-6">
                 <input type="hidden" id="modal-item-id">
-                <div class="mb-6">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2" id="modal-item-name">สินค้า</label>
-                    <input type="number" id="modal-min-stock-input" class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-3xl font-bold text-slate-700 focus:border-orange-400 outline-none" min="0">
-                </div>
-                <div class="flex justify-end gap-3">
-                    <button onclick="closeModal('min-stock-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold">ยกเลิก</button>
-                    <button onclick="saveMinStockModal()" class="px-5 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-bold shadow-lg">บันทึก</button>
-                </div>
+                <div class="mb-6"><label class="block text-xs font-bold text-slate-400 uppercase mb-2" id="modal-item-name">สินค้า</label><input type="number" id="modal-min-stock-input" class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-3xl font-bold text-slate-700 focus:border-orange-400 outline-none" min="0"></div>
+                <div class="flex justify-end gap-3"><button onclick="closeModal('min-stock-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold">ยกเลิก</button><button onclick="saveMinStockModal()" class="px-5 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-bold shadow-lg">บันทึก</button></div>
             </div>
         </div>
     </div>
@@ -145,84 +259,66 @@
         </div>
     </div>
 
-    <!-- SCRIPT 1: STATE & UI HELPERS (Global) -->
+    <!-- SCRIPT 1: STATE & UI HELPERS -->
     <script>
-        // --- LOCAL STATE ---
-        window.localData = { items: [], stock: [], transactions: [] };
-        window.appState = {
-            currentUser: { name: 'สมชาย คลังสินค้า', role: 'WAREHOUSE' },
-            currentView: 'dashboard',
-            issueCart: [], issueRefDoc: '', issueDate: ''
-        };
+        window.localData = { items: [], stock: [], transactions: [], users: [] };
+        window.appState = { currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '' };
 
-        // --- UI HELPERS ---
-        function renderSearchableItemInput(contextId) {
-            return `
-                <div class="relative group w-full" id="search-container-${contextId}">
-                    <div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all shadow-sm">
-                        <div class="bg-slate-50 px-3 py-2.5 border-r border-slate-200 text-slate-400"><i class="fas fa-search"></i></div>
-                        
-                        <input type="text" id="search-input-${contextId}" 
-                               class="w-full px-3 py-2.5 outline-none text-slate-700 placeholder-slate-400" 
-                               placeholder="พิมพ์รหัส SKU หรือ ชื่อสินค้า..." 
-                               autocomplete="off" 
-                               onfocus="openDropdown('${contextId}')" 
-                               oninput="handleSearchInput('${contextId}')"
-                               onblur="handleInputBlur('${contextId}')">
-                        
-                        <div id="clear-btn-${contextId}" class="hidden cursor-pointer px-3 text-slate-400 hover:text-danger transition-colors" onclick="clearSelection('${contextId}')"><i class="fas fa-times-circle"></i></div>
-                        <input type="hidden" name="itemId" id="hidden-item-id-${contextId}">
-                    </div>
-                    <div id="dropdown-list-${contextId}" class="hidden absolute z-50 w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in-down">${generateDropdownItems(contextId)}</div>
-                </div>`;
-        }
+        // UI HELPERS (Dropdowns, Modals, Alerts) - Optimized
+        function renderSearchableItemInput(cid) { return `<div class="relative group w-full" id="search-container-${cid}"><div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all shadow-sm"><div class="bg-slate-50 px-3 py-2.5 border-r border-slate-200 text-slate-400"><i class="fas fa-search"></i></div><input type="text" id="search-input-${cid}" class="w-full px-3 py-2.5 outline-none text-slate-700 placeholder-slate-400" placeholder="ค้นหา..." autocomplete="off" onfocus="openDropdown('${cid}')" oninput="handleSearchInput('${cid}')" onblur="handleInputBlur('${cid}')"><div id="clear-btn-${cid}" class="hidden cursor-pointer px-3 text-slate-400 hover:text-danger transition-colors" onclick="clearSelection('${cid}')"><i class="fas fa-times-circle"></i></div><input type="hidden" name="itemId" id="hidden-item-id-${cid}"></div><div id="dropdown-list-${cid}" class="hidden absolute z-50 w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in-down">${generateDropdownItems(cid)}</div></div>`; }
+        window.handleSearchInput = (cid) => { document.getElementById('hidden-item-id-'+cid).value = ''; document.getElementById('clear-btn-'+cid).classList.remove('hidden'); document.getElementById('dropdown-list-'+cid).innerHTML = generateDropdownItems(cid, document.getElementById('search-input-'+cid).value); document.getElementById('dropdown-list-'+cid).classList.remove('hidden'); };
+        window.handleInputBlur = (cid) => { setTimeout(() => { const h=document.getElementById('hidden-item-id-'+cid), i=document.getElementById('search-input-'+cid), l=document.getElementById('dropdown-list-'+cid), c=document.getElementById('clear-btn-'+cid); if(l) l.classList.add('hidden'); if(h && !h.value && i) { i.value=''; if(c) c.classList.add('hidden'); } }, 200); };
+        function generateDropdownItems(cid, txt='') { const l=window.localData.items.filter(i=>i.code.toLowerCase().includes(txt.toLowerCase())||i.name.toLowerCase().includes(txt.toLowerCase())); return l.length?l.map(i=>`<div class="cursor-pointer hover:bg-indigo-50 px-4 py-3 border-b border-slate-100 last:border-0" onclick="selectDropdownItem('${cid}','${i.id}','${i.code}','${i.name}')"><div class="flex justify-between"><span class="font-bold text-indigo-600 font-mono">${i.code}</span><span class="text-xs bg-slate-200 px-2 rounded">${i.type}</span></div><div class="text-sm text-slate-700">${i.name}</div></div>`).join(''):`<div class="p-4 text-slate-400 text-center text-sm">ไม่พบสินค้า</div>`; }
+        window.openDropdown=(cid)=>{document.getElementById('dropdown-list-'+cid).innerHTML=generateDropdownItems(cid);document.getElementById('dropdown-list-'+cid).classList.remove('hidden');};
+        window.selectDropdownItem=(cid,id,c,n)=>{document.getElementById('hidden-item-id-'+cid).value=id;document.getElementById('search-input-'+cid).value=`${c} : ${n}`;document.getElementById('dropdown-list-'+cid).classList.add('hidden');document.getElementById('clear-btn-'+cid).classList.remove('hidden');};
+        window.clearSelection=(cid)=>{document.getElementById('hidden-item-id-'+cid).value='';document.getElementById('search-input-'+cid).value='';document.getElementById('clear-btn-'+cid).classList.add('hidden');};
+        window.alertSuccess=(m)=>alert("✅ "+m); window.alertError=(m)=>alert("❌ "+m); window.closeModal=(id)=>document.getElementById(id).classList.add('hidden');
 
-        window.handleSearchInput = (cid) => {
-            document.getElementById('hidden-item-id-'+cid).value = ''; 
-            document.getElementById('clear-btn-'+cid).classList.remove('hidden');
-            const val = document.getElementById('search-input-'+cid).value;
-            document.getElementById('dropdown-list-'+cid).innerHTML = generateDropdownItems(cid, val);
-            document.getElementById('dropdown-list-'+cid).classList.remove('hidden');
-        };
-
-        window.handleInputBlur = (cid) => {
-            setTimeout(() => {
-                const hidden = document.getElementById('hidden-item-id-'+cid);
-                const input = document.getElementById('search-input-'+cid);
-                const list = document.getElementById('dropdown-list-'+cid);
-                const clearBtn = document.getElementById('clear-btn-'+cid);
-                if(list) list.classList.add('hidden');
-                if(hidden && !hidden.value && input) {
-                    input.value = ''; 
-                    if(clearBtn) clearBtn.classList.add('hidden');
-                }
-            }, 200);
-        };
-
-        function generateDropdownItems(contextId, filterText = '') {
-            const lowerFilter = filterText.toLowerCase();
-            const filtered = window.localData.items.filter(i => i.code.toLowerCase().includes(lowerFilter) || i.name.toLowerCase().includes(lowerFilter));
-            if (filtered.length === 0) return `<div class="p-4 text-slate-400 text-center text-sm">ไม่พบสินค้า "${filterText}"</div>`;
-            return filtered.map(item => `
-                <div class="cursor-pointer hover:bg-indigo-50 px-4 py-3 border-b border-slate-100 last:border-0 transition-colors group" onclick="selectDropdownItem('${contextId}', '${item.id}', '${item.code}', '${item.name}')">
-                    <div class="flex justify-between"><span class="font-bold text-indigo-600 font-mono">${item.code}</span><span class="text-xs bg-slate-200 px-2 rounded">${item.type}</span></div>
-                    <div class="text-sm text-slate-700">${item.name}</div>
-                </div>`).join('');
-        }
-
-        window.openDropdown = (cid) => { document.getElementById('dropdown-list-'+cid).innerHTML = generateDropdownItems(cid); document.getElementById('dropdown-list-'+cid).classList.remove('hidden'); };
-        window.selectDropdownItem = (cid, id, code, name) => { document.getElementById('hidden-item-id-'+cid).value = id; document.getElementById('search-input-'+cid).value = `${code} : ${name}`; document.getElementById('dropdown-list-'+cid).classList.add('hidden'); document.getElementById('clear-btn-'+cid).classList.remove('hidden'); };
-        window.clearSelection = (cid) => { document.getElementById('hidden-item-id-'+cid).value=''; document.getElementById('search-input-'+cid).value=''; document.getElementById('clear-btn-'+cid).classList.add('hidden'); };
-        
-        window.closeAllDropdowns = (e) => { 
-            if(!e.target.closest('[id^="search-container-"]')) {
-                document.querySelectorAll('[id^="dropdown-list-"]').forEach(el => el.classList.add('hidden'));
+        // AUTH & PROFILE HANDLERS
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const d = new FormData(e.target);
+            const user = window.localData.users.find(u => u.username === d.get('username') && u.password === d.get('password'));
+            
+            if (user) {
+                window.appState.currentUser = user;
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-layout').classList.remove('hidden');
+                setTimeout(()=>document.getElementById('app-layout').classList.remove('opacity-0'),50);
+                renderView('dashboard');
+            } else {
+                const err = document.getElementById('login-error');
+                err.innerText = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+                err.classList.remove('hidden');
             }
         };
+
+        window.logout = () => {
+            if(confirm('ออกจากระบบ?')) {
+                window.appState.currentUser = null;
+                document.getElementById('app-layout').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('app-layout').classList.add('hidden');
+                    document.getElementById('login-view').classList.remove('hidden');
+                    document.querySelector('#login-view form').reset();
+                    document.getElementById('login-error').classList.add('hidden');
+                }, 300);
+            }
+        };
+
+        window.openProfileModal = () => {
+            const u = window.appState.currentUser;
+            document.getElementById('profile-id').value = u.id;
+            document.getElementById('profile-username').value = u.username;
+            document.getElementById('profile-name').value = u.name;
+            document.getElementById('profile-password').value = '';
+            document.getElementById('profile-modal').classList.remove('hidden');
+        };
         
-        window.alertSuccess = (m) => alert("✅ " + m); 
-        window.alertError = (m) => alert("❌ " + m);
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+        window.openUserManageModal = () => {
+            if (window.appState.currentUser.role !== 'ADMIN') return alertError('Admin Only');
+            document.getElementById('user-manage-modal').classList.remove('hidden');
+        };
     </script>
 
     <!-- SCRIPT 2: FIREBASE MODULE -->
@@ -245,160 +341,135 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        // FIXED: Static path for production/GitHub
         const appId = 'factory-os-main'; 
 
-        // INIT APP
         async function initApp() {
             try {
                 await signInAnonymously(auth); 
-                const user = auth.currentUser;
-                if (!user) throw new Error("Auth failed");
-
                 const basePath = `artifacts/${appId}/public/data`;
                 
-                onSnapshot(collection(db, basePath, 'items'), (snap) => {
-                    window.localData.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    refreshViewIfActive();
-                });
-                onSnapshot(collection(db, basePath, 'stock'), (snap) => {
-                    window.localData.stock = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    refreshViewIfActive();
-                });
-                onSnapshot(collection(db, basePath, 'transactions'), (snap) => {
-                    const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    window.localData.transactions = txs.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
-                    refreshViewIfActive();
+                // Realtime Listeners
+                onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); refreshView(); });
+                onSnapshot(collection(db, basePath, 'stock'), (s) => { window.localData.stock = s.docs.map(d=>({id:d.id,...d.data()})); refreshView(); });
+                onSnapshot(collection(db, basePath, 'transactions'), (s) => { window.localData.transactions = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)); refreshView(); });
+                
+                // User Listener & Init Default Users
+                onSnapshot(collection(db, basePath, 'users'), async (s) => { 
+                    window.localData.users = s.docs.map(d=>({id:d.id,...d.data()}));
+                    
+                    // Seed defaults if missing
+                    const seedUsers = [
+                        { username: 'admin', password: '1234', name: 'System Admin', role: 'ADMIN' },
+                        { username: 'stock', password: '1234', name: 'Stock Manager', role: 'STOCK' },
+                        { username: 'qc', password: '1234', name: 'QC Inspector', role: 'QC' }
+                    ];
+
+                    for (const u of seedUsers) {
+                        if (!window.localData.users.find(exist => exist.username === u.username)) {
+                            // Check again in case of race condition from snapshot
+                            await addDoc(collection(db, basePath, 'users'), u);
+                        }
+                    }
+                    
+                    refreshView(); 
                 });
 
                 document.getElementById('loading-screen').classList.add('hidden');
-                renderView('dashboard');
-                
+                document.getElementById('login-view').classList.remove('hidden');
             } catch (e) {
                 console.error(e);
                 document.getElementById('loading-screen').innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Connection Error:<br>${e.message}</div>`;
             }
         }
-        
-        function refreshViewIfActive() { renderView(window.appState.currentView); }
+        function refreshView() { if(window.appState.currentUser) renderView(window.appState.currentView); }
         initApp();
 
-        // --- EXPORTED ACTIONS ---
-        window.checkPerm = (action) => {
-            const role = window.appState.currentUser.role;
-            if (action === 'manage_item') return role === 'ADMIN' || role === 'WAREHOUSE'; 
-            return false;
+        // --- EXPORTED DB ACTIONS ---
+        window.createItem = async (d) => { try { await addDoc(collection(db, `artifacts/${appId}/public/data/items`), { code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); alertSuccess('สำเร็จ'); renderView('item-master'); } catch(e){alertError(e.message)} };
+        window.deleteItem = async (id) => { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e){alertError(e.message)} };
+        window.saveEditItem = async () => { const id=document.getElementById('edit-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) }); closeModal('edit-item-modal'); alertSuccess('แก้ไขแล้ว'); } catch(e){alertError(e.message)} };
+        window.saveMinStockModal = async () => { const id=document.getElementById('modal-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: parseInt(document.getElementById('modal-min-stock-input').value) }); closeModal('min-stock-modal'); } catch(e){alertError(e.message)} };
+        window.receiveItem = async (d) => { const today=new Date().toISOString().split('T')[0]; try { await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: parseInt(d.itemId), lotNo: d.lotNo, qty: parseInt(d.qty), status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: today }); await logTransaction('RECEIVE', parseInt(d.itemId), d.lotNo, parseInt(d.qty), `Loc: ${d.location}`); alertSuccess('รับของแล้ว'); renderView('dashboard'); } catch(e){alertError(e.message)} };
+        window.qcAction = async (id, act, rem) => { const s=window.localData.stock.find(x=>x.id===id); if(!s)return; let st=act==='PASS'?'AVAILABLE':(act==='HOLD'?'HOLD':'REJECT'); try { await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); await logTransaction('QC_'+act, s.itemId, s.lotNo, 0, `${s.status}->${st} (${rem})`); alertSuccess('บันทึก QC'); } catch(e){alertError(e.message)} };
+        
+        window.processIssueBatch = async () => {
+            if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return alertError('ข้อมูลไม่ครบ');
+            try {
+                for(let c of window.appState.issueCart) {
+                    const lots = window.localData.stock.filter(s=>s.itemId==c.itemId && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate));
+                    let rem = c.qty;
+                    for(let l of lots) {
+                        if(rem<=0) break;
+                        let deduct = Math.min(l.qty, rem);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, l.id), { qty: l.qty - deduct });
+                        await logTransaction('ISSUE', c.itemId, l.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate);
+                        rem -= deduct;
+                    }
+                }
+                window.appState.issueCart=[]; window.appState.issueRefDoc=''; alertSuccess('เบิกสำเร็จ'); renderView('dashboard');
+            } catch(e){alertError(e.message)}
         };
 
-        window.createItem = async (formData) => {
-            if (!checkPerm('manage_item')) return alertError('ไม่มีสิทธิ์: เฉพาะ Admin หรือ Warehouse');
-            if(window.localData.items.find(i => i.code === formData.code)) return alertError('รหัสซ้ำ!');
+        // NEW: User Management Actions
+        window.saveProfile = async () => {
+            const id = document.getElementById('profile-id').value;
+            const name = document.getElementById('profile-name').value;
+            const pass = document.getElementById('profile-password').value;
+            const updateData = { name: name };
+            if(pass) updateData.password = pass;
             try {
-                await addDoc(collection(db, `artifacts/${appId}/public/data/items`), {
-                    code: formData.code.toUpperCase(), name: formData.name, type: formData.type, unit: formData.unit, minStock: parseInt(formData.minStock) || 0
-                });
-                alertSuccess('เพิ่มสินค้าสำเร็จ'); renderView('item-master');
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/users`, id), updateData);
+                // Update local session
+                window.appState.currentUser.name = name;
+                if(pass) window.appState.currentUser.password = pass;
+                closeModal('profile-modal');
+                alertSuccess('บันทึกโปรไฟล์เรียบร้อย');
+                renderView(window.appState.currentView);
             } catch(e) { alertError(e.message); }
         };
 
-        window.deleteItem = async (id) => {
-             if (checkPerm('manage_item') && confirm('ยืนยันลบ?')) {
-                 try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e) { alertError(e.message); }
-             }
+        window.handleCreateUser = async (e) => {
+            e.preventDefault();
+            const d = new FormData(e.target);
+            if(window.localData.users.find(u => u.username === d.get('new_username'))) return alertError('Username ซ้ำ');
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/data/users`), {
+                    username: d.get('new_username'), password: d.get('new_password'), name: d.get('new_name'), role: d.get('new_role')
+                });
+                closeModal('user-manage-modal');
+                alertSuccess('สร้างผู้ใช้เรียบร้อย');
+                renderView('user-list');
+            } catch(e) { alertError(e.message); }
         };
 
-        window.saveEditItem = async () => {
-             if (!checkPerm('manage_item')) return;
-             const id = document.getElementById('edit-item-id').value;
-             try {
-                 await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), {
-                     name: document.getElementById('edit-item-name').value,
-                     type: document.getElementById('edit-item-type').value,
-                     unit: document.getElementById('edit-item-unit').value,
-                     minStock: parseInt(document.getElementById('edit-item-min').value)
-                 });
-                 closeModal('edit-item-modal');
-                 alertSuccess('แก้ไขเรียบร้อย');
-             } catch(e) { alertError(e.message); }
+        window.deleteUser = async (id) => {
+            if(confirm('ลบผู้ใช้งานนี้?')) {
+                try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/users`, id)); alertSuccess('ลบแล้ว'); renderView('user-list'); } catch(e){alertError(e.message)}
+            }
         };
 
-        window.saveMinStockModal = async () => {
-             if (!checkPerm('manage_item')) return;
-             const id = document.getElementById('modal-item-id').value;
-             const val = parseInt(document.getElementById('modal-min-stock-input').value);
-             try {
-                 await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: val });
-                 closeModal('min-stock-modal');
-             } catch(e) { alertError(e.message); }
-        };
-
-        window.receiveItem = async (data) => {
-             const today = new Date().toISOString().split('T')[0];
-             try {
-                 await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), {
-                     itemId: data.itemId, lotNo: data.lotNo, qty: parseInt(data.qty), status: 'WAIT_QC',
-                     expDate: data.expDate, location: data.location, receivedDate: today
-                 });
-                 await logTransaction('RECEIVE', data.itemId, data.lotNo, parseInt(data.qty), `Location: ${data.location}`);
-                 alertSuccess('บันทึกรับของเรียบร้อย'); renderView('dashboard');
-             } catch(e) { alertError(e.message); }
-        };
-
-        window.qcAction = async (stockId, action, remark) => {
-             const stock = window.localData.stock.find(s => s.id === stockId);
-             if(!stock) return;
-             let newStatus = action === 'PASS' ? 'AVAILABLE' : 'REJECT';
-             if(action === 'HOLD') newStatus = 'HOLD';
-             try {
-                 await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockId), { status: newStatus });
-                 await logTransaction('QC_' + action, stock.itemId, stock.lotNo, 0, `${stock.status} -> ${newStatus} (${remark})`);
-                 alertSuccess('บันทึกผล QC เรียบร้อย');
-             } catch(e) { alertError(e.message); }
-        };
-
-        window.processIssueBatch = async () => {
-             if(window.appState.issueCart.length === 0) return alertError('ไม่มีรายการ');
-             if(!window.appState.issueRefDoc) return alertError('ระบุ Ref Doc');
-             if(!window.appState.issueDate) return alertError('ระบุวันที่');
-
-             try {
-                 for(let c of window.appState.issueCart) {
-                     const availableLots = window.localData.stock
-                        .filter(s => s.itemId === c.itemId && s.status === 'AVAILABLE' && s.qty > 0)
-                        .sort((a,b) => new Date(a.expDate) - new Date(b.expDate));
-                     let remaining = c.qty;
-                     for(let lot of availableLots) {
-                         if(remaining <= 0) break;
-                         let deduct = Math.min(lot.qty, remaining);
-                         await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, lot.id), { qty: lot.qty - deduct });
-                         await logTransaction('ISSUE', c.itemId, lot.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate);
-                         remaining -= deduct;
-                     }
-                     if(remaining > 0) alertError(`สินค้า ${c.item.code} ตัดได้ไม่ครบ (ขาด ${remaining})`);
-                 }
-                 window.appState.issueCart = []; window.appState.issueRefDoc = ''; alertSuccess('ตัดสต็อกเรียบร้อย'); renderView('dashboard');
-             } catch(e) { alertError(e.message); }
-        };
-
-        async function logTransaction(type, itemId, lotNo, qtyChange, note, customDate) {
-            const item = window.localData.items.find(i => i.id === itemId);
-            const itemName = item ? `${item.code} - ${item.name}` : 'Unknown';
-            const timestamp = customDate ? new Date(customDate).getTime() : Date.now();
-            const dateStr = customDate ? new Date(customDate).toLocaleString('th-TH') : new Date().toLocaleString('th-TH');
+        async function logTransaction(type, itemId, lotNo, qty, note, cDate) {
+            const i = window.localData.items.find(x=>x.id==itemId);
             await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), {
-                type, itemId, item: itemName, lot: lotNo, qty: qtyChange,
-                actionBy: window.appState.currentUser.name + ` (${window.appState.currentUser.role})`,
-                note: note || '-', date: dateStr, timestamp: timestamp
+                type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
+                actionBy: window.appState.currentUser.name, note: note||'-', 
+                date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), timestamp: Date.now()
             });
         }
     </script>
 
-    <!-- SCRIPT 3: UI RENDERERS (Views) -->
+    <!-- SCRIPT 3: UI RENDERERS -->
     <script>
-        // Handlers
+        // Check Perm (Updated)
+        function checkPerm(act) { 
+            const r=window.appState.currentUser.role; 
+            if (act==='manage_item') return (r==='ADMIN'||r==='STOCK'); // STOCK can manage items
+            return false; 
+        }
+        
+        // Modal & Form Handlers
         function handleCreateItem(e) { e.preventDefault(); window.createItem(Object.fromEntries(new FormData(e.target))); }
-        function handleReceiveSubmit(e) { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); if(!d.itemId) return alertError("เลือกสินค้า"); const item = window.localData.items.find(i=>i.id==d.itemId); if(item && d.unit!==item.unit) return alertError("หน่วยผิด"); window.receiveItem(d); e.target.reset(); document.getElementById('search-input-receive-item').value = ''; }
+        function handleReceiveSubmit(e) { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); if(!d.itemId) return alertError("เลือกสินค้า"); const i=window.localData.items.find(x=>x.id==d.itemId); if(i && d.unit!==i.unit) return alertError("หน่วยผิด"); window.receiveItem(d); e.target.reset(); document.getElementById('search-input-receive-item').value = ''; }
         function handleAddIssueItem() { 
             const id=document.getElementById('hidden-item-id-issue-item').value; 
             const qty=parseInt(document.getElementById('input-qty').value);
@@ -411,124 +482,87 @@
             renderView('issue');
         }
         function removeFromIssueCart(idx) { window.appState.issueCart.splice(idx, 1); renderView('issue'); }
-        function openMinStockModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Warehouse'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('modal-item-id').value=id; document.getElementById('modal-item-name').innerText=`${i.code}: ${i.name}`; document.getElementById('modal-min-stock-input').value=i.minStock||0; document.getElementById('min-stock-modal').classList.remove('hidden'); setTimeout(() => { document.getElementById('modal-min-stock-input').select(); }, 100); };
-        function openEditItemModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Warehouse'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('edit-item-id').value = i.id; document.getElementById('edit-item-code').value = i.code; document.getElementById('edit-item-name').value = i.name; document.getElementById('edit-item-type').value = i.type; document.getElementById('edit-item-unit').value = i.unit; document.getElementById('edit-item-min').value = i.minStock || 0; document.getElementById('edit-item-modal').classList.remove('hidden'); };
+        function openMinStockModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Stock'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('modal-item-id').value=id; document.getElementById('modal-item-name').innerText=`${i.code}: ${i.name}`; document.getElementById('modal-min-stock-input').value=i.minStock||0; document.getElementById('min-stock-modal').classList.remove('hidden'); setTimeout(() => { document.getElementById('modal-min-stock-input').select(); }, 100); };
+        function openEditItemModal(id) { if(!checkPerm('manage_item')) return alertError('เฉพาะ Admin/Stock'); const i = window.localData.items.find(x=>x.id===id); document.getElementById('edit-item-id').value = i.id; document.getElementById('edit-item-code').value = i.code; document.getElementById('edit-item-name').value = i.name; document.getElementById('edit-item-type').value = i.type; document.getElementById('edit-item-unit').value = i.unit; document.getElementById('edit-item-min').value = i.minStock || 0; document.getElementById('edit-item-modal').classList.remove('hidden'); };
 
         // Renderers
         const menuConfig = {
-            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
-            WAREHOUSE: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
+            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
+            STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
             QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'สถานะคลัง',i:'fa-boxes-stacked'}]
         };
 
         window.renderView = (viewId) => {
             window.appState.currentView = viewId;
-            const role = window.appState.currentUser.role;
-            document.getElementById('menu-list').innerHTML = (menuConfig[role]||[]).map(m => `
-                <li onclick="renderView('${m.id}')" class="nav-item ${viewId===m.id?'active':''} group flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 mx-2">
-                    <i class="fas ${m.i} w-6 text-center text-lg"></i><span class="font-medium text-sm">${m.l}</span>
-                </li>`).join('');
-            document.getElementById('current-user-role').innerText = role;
-            document.getElementById('current-user-name').innerText = window.appState.currentUser.name;
+            const user = window.appState.currentUser;
+            document.getElementById('menu-list').innerHTML = (menuConfig[user.role]||[]).map(m => `<li onclick="renderView('${m.id}')" class="nav-item ${viewId===m.id?'active':''} group flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 mx-2"><i class="fas ${m.i} w-6 text-center text-lg"></i><span class="font-medium text-sm">${m.l}</span></li>`).join('');
+            document.getElementById('current-user-role').innerText = user.role;
+            document.getElementById('current-user-name').innerText = user.name;
+            document.getElementById('topbar-user-name').innerText = user.name;
+            document.getElementById('topbar-user-role').innerText = user.role;
 
             const content = document.getElementById('content-area');
-            if(viewId === 'dashboard') content.innerHTML = renderDashboard();
-            else if(viewId === 'inventory-status') content.innerHTML = renderInventoryStatus();
-            else if(viewId === 'item-master') content.innerHTML = renderItemMaster();
-            else if(viewId === 'receive') content.innerHTML = renderReceiveForm();
-            else if(viewId === 'qc-task') content.innerHTML = renderQCTask();
-            else if(viewId === 'issue') content.innerHTML = renderIssueForm();
-            else if(viewId === 'history') content.innerHTML = renderHistory();
+            if(viewId==='dashboard') content.innerHTML=renderDashboard();
+            else if(viewId==='inventory-status') content.innerHTML=renderInventoryStatus();
+            else if(viewId==='item-master') content.innerHTML=renderItemMaster();
+            else if(viewId==='receive') content.innerHTML=renderReceiveForm();
+            else if(viewId==='qc-task') content.innerHTML=renderQCTask();
+            else if(viewId==='issue') content.innerHTML=renderIssueForm();
+            else if(viewId==='history') content.innerHTML=renderHistory();
+            else if(viewId==='user-list') content.innerHTML=renderUserList();
         };
 
         function renderDashboard() {
-            let totalItem=window.localData.items.length, low=0, qc=0, avail=0;
-            window.localData.items.forEach(i => {
-                const stk = window.localData.stock.filter(s=>s.itemId===i.id);
-                const sum = stk.reduce((a,b)=>a+b.qty,0);
-                if(sum <= (i.minStock||0) && (i.minStock||0)>0) low++;
-            });
-            window.localData.stock.forEach(s => { 
-                if(s.status==='WAIT_QC') qc++; 
-                if(s.status==='AVAILABLE') avail++; 
-            });
-
-            return `<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                ${cardHtml('สินค้าทั้งหมด', totalItem, 'fa-boxes', 'text-slate-800', 'bg-indigo-50 text-indigo-600')}
-                ${cardHtml('สินค้าใกล้หมด', low, 'fa-exclamation-triangle', low>0?'text-red-600':'text-slate-800', low>0?'bg-red-50 text-red-500 animate-pulse':'bg-slate-50 text-slate-400')}
-                ${cardHtml('รอตรวจสอบ QC (Lot)', qc, 'fa-microscope', 'text-amber-500', 'bg-amber-50 text-amber-500')}
-                ${cardHtml('สินค้าพร้อมเบิก (Lot)', avail, 'fa-cubes', 'text-emerald-600', 'bg-emerald-50 text-emerald-600')}
-            </div>`;
+            let total=window.localData.items.length, low=0, qc=0, avail=0;
+            window.localData.items.forEach(i=>{ const sum=window.localData.stock.filter(s=>s.itemId==i.id).reduce((a,b)=>a+b.qty,0); if(sum<=(i.minStock||0)&&(i.minStock||0)>0)low++; });
+            window.localData.stock.forEach(s=>{ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; });
+            return `<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}${card('สินค้าใกล้หมด',low,'fa-exclamation-triangle',low>0?'text-red-600':'text-slate-800',low>0?'bg-red-50 text-red-500 animate-pulse':'bg-slate-50 text-slate-400')}${card('รอตรวจสอบ QC',qc,'fa-microscope','text-amber-500','bg-amber-50 text-amber-500')}${card('พร้อมเบิก (Lot)',avail,'fa-cubes','text-emerald-600','bg-emerald-50 text-emerald-600')}</div>`;
         }
-        function cardHtml(t, v, i, tc, ic) { return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2">${t}</p><h3 class="text-3xl font-bold ${tc}">${v.toLocaleString()}</h3></div><div class="p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`; }
+        function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2">${t}</p><h3 class="text-3xl font-bold ${tc}">${v.toLocaleString()}</h3></div><div class="p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
 
         function renderInventoryStatus() {
-            const input = document.getElementById('inventory-search');
-            let rows = window.localData.items.map(item => {
-                const stk = window.localData.stock.filter(s=>s.itemId===item.id);
-                const total = stk.reduce((a,b)=>a+b.qty,0);
-                const avail = stk.filter(s=>s.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0);
-                const wait = stk.filter(s=>s.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
-                const min = item.minStock || 0;
+            const inp=document.getElementById('inventory-search'); const txt=inp?inp.value:'';
+            const rows = window.localData.items.map(i => {
+                const s = window.localData.stock.filter(x=>x.itemId==i.id);
+                const tot = s.reduce((a,b)=>a+b.qty,0);
+                const av = s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0);
+                const qc = s.filter(x=>x.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
+                const min = i.minStock||0;
                 
-                const active = stk.filter(s=>s.qty>0);
-                let aging = '<span class="text-slate-300">-</span>';
-                if(active.length){
+                // Aging
+                const active = s.filter(x=>x.qty>0);
+                let ag = '<span class="text-slate-300">-</span>';
+                if(active.length) {
                     const old = active.sort((a,b)=>new Date(a.receivedDate)-new Date(b.receivedDate))[0];
                     if(old && old.receivedDate) {
-                        const days = Math.floor((new Date()-new Date(old.receivedDate))/(86400000));
-                        let c = days<=30 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100';
-                        aging = `<span class="px-2 py-0.5 rounded text-xs border ${c}">${days} วัน</span>`;
+                        const d = Math.floor((new Date()-new Date(old.receivedDate))/86400000);
+                        ag = `<span class="px-2 py-0.5 rounded text-xs border ${d<=30?'bg-emerald-50 text-emerald-700 border-emerald-100':'bg-red-50 text-red-700 border-red-100'}">${d} วัน</span>`;
                     }
                 }
-                const btnClass = checkPerm('manage_item') ? 'text-slate-400 hover:text-primary' : 'text-slate-200 cursor-not-allowed';
-                return `<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 item-row" data-search="${item.code.toLowerCase()} ${item.name.toLowerCase()}">
-                    <td class="py-3 px-6 font-bold text-indigo-600 font-mono">${item.code}</td><td class="py-3 px-6 text-slate-700">${item.name}</td>
-                    <td class="py-3 px-6 text-center text-xs"><span class="bg-slate-100 px-2 py-1 rounded">${item.type}</span></td>
-                    <td class="py-3 px-6 text-center text-slate-500">${min}</td><td class="py-3 px-6 text-center">${aging}</td>
-                    <td class="py-3 px-6 text-right font-bold ${total<=min&&min>0?'text-red-600':'text-slate-800'}">${total.toLocaleString()}</td>
-                    <td class="py-3 px-6 text-xs text-slate-400 uppercase">${item.unit}</td>
-                    <td class="py-3 px-6 text-right font-bold text-emerald-600">${avail.toLocaleString()}</td>
-                    <td class="py-3 px-6 text-right font-bold text-amber-500">${wait>0?wait:'-'}</td>
-                    <td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${item.id}')" class="${btnClass}"><i class="fas fa-cog"></i></button></td>
-                </tr>`;
+                const cls = checkPerm('manage_item')?'text-slate-400 hover:text-primary':'text-slate-200 cursor-not-allowed';
+                return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row" data-search="${i.code.toLowerCase()} ${i.name.toLowerCase()}"><td class="py-3 px-6 font-bold text-indigo-600 font-mono">${i.code}</td><td class="py-3 px-6 text-slate-700">${i.name}</td><td class="py-3 px-6 text-center text-xs"><span class="bg-slate-100 px-2 py-1 rounded">${i.type}</span></td><td class="py-3 px-6 text-center text-slate-500">${min}</td><td class="py-3 px-6 text-center">${ag}</td><td class="py-3 px-6 text-right font-bold ${tot<=min&&min>0?'text-red-600':'text-slate-800'}">${tot.toLocaleString()}</td><td class="py-3 px-6 text-xs text-slate-400 uppercase">${i.unit}</td><td class="py-3 px-6 text-right font-bold text-emerald-600">${av.toLocaleString()}</td><td class="py-3 px-6 text-right font-bold text-amber-500">${qc>0?qc:'-'}</td><td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${i.id}')" class="${cls}"><i class="fas fa-cog"></i></button></td></tr>`;
             }).join('');
-            
-            return `<div class="space-y-6 max-w-7xl mx-auto"><div class="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div><h3 class="font-bold text-xl text-slate-800 flex items-center gap-2"><i class="fas fa-boxes-stacked text-primary"></i> รายการสินค้าคงคลัง</h3><p class="text-slate-500 text-sm mt-1">จัดการสถานะสินค้า (${window.localData.items.length} รายการ)</p></div><div class="w-full md:w-auto"><div class="relative group w-full sm:w-64"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-slate-400"></i></div><input type="text" id="inventory-search" onkeyup="filterInventoryTable()" class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl bg-slate-50 focus:outline-none focus:bg-white focus:border-primary transition-all sm:text-sm" placeholder="ค้นหา SKU..."></div></div></div><div class="flex justify-end text-xs text-slate-500 gap-3"><span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-emerald-500"></div> ≤ 30 วัน</span><span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-red-500"></div> > 30 วัน</span></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[600px] flex flex-col"><div class="flex-1 overflow-auto custom-scrollbar"><table class="w-full text-sm text-left border-collapse" id="inventory-table"><thead class="bg-slate-50 text-slate-500 uppercase text-xs sticky top-0 z-10 shadow-sm"><tr><th class="py-4 px-6">รหัส</th><th class="py-4 px-6">ชื่อ</th><th class="py-4 px-6 text-center">ประเภท</th><th class="py-4 px-6 text-center">Min</th><th class="py-4 px-6 text-center">Aging</th><th class="py-4 px-6 text-right">คงเหลือ</th><th class="py-4 px-6">หน่วย</th><th class="py-4 px-6 text-right">พร้อมใช้</th><th class="py-4 px-6 text-right">รอ QC</th><th class="py-4 px-6 text-center">ตั้งค่า</th></tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div></div></div>`;
+            return `<div class="space-y-6 max-w-7xl mx-auto"><div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border"><div><h3 class="font-bold text-xl text-slate-800"><i class="fas fa-boxes-stacked text-primary mr-2"></i> สถานะคลังสินค้า</h3></div><div><input id="inventory-search" onkeyup="filterInventoryTable()" class="border p-2 rounded-lg bg-slate-50" placeholder="ค้นหา..."></div></div><div class="bg-white rounded-2xl shadow-sm border overflow-hidden h-[600px] flex flex-col"><div class="flex-1 overflow-auto custom-scrollbar"><table class="w-full text-sm text-left border-collapse" id="inventory-table"><thead class="bg-slate-50 sticky top-0 shadow-sm"><tr><th class="py-4 px-6">รหัส</th><th class="py-4 px-6">ชื่อ</th><th class="text-center">ประเภท</th><th class="text-center">Min</th><th class="text-center">Aging</th><th class="text-right">คงเหลือ</th><th>หน่วย</th><th class="text-right">พร้อมใช้</th><th class="text-right">รอ QC</th><th class="text-center">ตั้งค่า</th></tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
         }
-        
-        window.filterInventoryTable = () => {
-            const input = document.getElementById('inventory-search');
-            if(!input) return;
-            const filter = input.value.toLowerCase();
-            const rows = document.querySelectorAll('#inventory-table .item-row');
-            rows.forEach(row => {
-                const text = row.getAttribute('data-search');
-                row.style.display = text.includes(filter) ? "" : "none";
-            });
-        };
+        window.filterInventoryTable = () => { const f=document.getElementById('inventory-search').value.toLowerCase(); document.querySelectorAll('.item-row').forEach(r => r.style.display = r.getAttribute('data-search').includes(f)?"":"none"); };
 
         function renderItemMaster() {
-            const canManage = checkPerm('manage_item');
-            const form = canManage ? `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-24"><h3 class="font-bold mb-4 flex items-center text-slate-800"><i class="fas fa-plus-circle text-primary mr-2"></i> สร้างสินค้าใหม่</h3><form onsubmit="handleCreateItem(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500 uppercase">รหัสสินค้า</label><input name="code" class="w-full border p-2 rounded-lg font-mono" placeholder="Ex. RM-001" required></div><div><label class="text-xs font-bold text-slate-500 uppercase">ชื่อสินค้า</label><input name="name" class="w-full border p-2 rounded-lg" required></div><div class="grid grid-cols-2 gap-2"><div><label class="text-xs font-bold text-slate-500 uppercase">ประเภท</label><select name="type" class="w-full border p-2 rounded-lg bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div><div><label class="text-xs font-bold text-slate-500 uppercase">หน่วย</label><select name="unit" class="w-full border p-2 rounded-lg bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div></div><div><label class="text-xs font-bold text-slate-500 uppercase">Min Stock</label><input type="number" name="minStock" class="w-full border p-2 rounded-lg" value="0"></div><button class="w-full bg-primary hover:bg-indigo-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all">บันทึกสินค้า</button></form></div>` 
-            : `<div class="bg-slate-50 p-8 rounded-2xl text-center border border-slate-200"><i class="fas fa-lock text-4xl text-slate-300 mb-3"></i><h3 class="text-slate-600 font-bold">จำกัดสิทธิ์</h3><p class="text-slate-400 text-sm">เฉพาะ Admin หรือ Warehouse เท่านั้นที่เพิ่มสินค้าได้</p></div>`;
-            
-            const list = window.localData.items.map(i => `<tr class="border-b border-slate-100 hover:bg-slate-50 group transition-colors"><td class="py-3 px-4 font-bold text-primary font-mono">${i.code}</td><td class="py-3 px-4 text-slate-700">${i.name}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 px-2 rounded text-xs font-bold text-slate-500">${i.type}</span></td><td class="py-3 px-4 text-center text-slate-500">${i.unit}</td><td class="py-3 px-4 text-center">${canManage ? `<button onclick="openEditItemModal('${i.id}')" class="text-slate-400 hover:text-blue-500 mr-2 p-1 transition-colors"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-400 hover:text-red-500 p-1 transition-colors"><i class="fas fa-trash-alt"></i></button>`:'<i class="fas fa-lock text-slate-200"></i>'}</td></tr>`).join('');
-            
-            return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">${form}<div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50"><h3 class="font-bold text-slate-700">รายการสินค้า (Product List)</h3></div><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs"><tr><th class="py-3 px-4">รหัส</th><th class="py-3 px-4">ชื่อ</th><th class="py-3 px-4 text-center">ประเภท</th><th class="py-3 px-4 text-center">หน่วย</th><th class="py-3 px-4 text-center">จัดการ</th></tr></thead><tbody class="divide-y divide-slate-100">${list}</tbody></table></div></div>`;
+            const can = checkPerm('manage_item');
+            const form = can ? `<div class="bg-white rounded-2xl shadow-sm border p-6 sticky top-24"><h3 class="font-bold mb-4 flex items-center text-slate-800"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้า</h3><form onsubmit="handleCreateItem(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500">รหัส</label><input name="code" class="w-full border p-2 rounded-lg" required></div><div><label class="text-xs font-bold text-slate-500">ชื่อ</label><input name="name" class="w-full border p-2 rounded-lg" required></div><div class="grid grid-cols-2 gap-2"><div><label class="text-xs font-bold text-slate-500">ประเภท</label><select name="type" class="w-full border p-2 rounded-lg bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div><div><label class="text-xs font-bold text-slate-500">หน่วย</label><select name="unit" class="w-full border p-2 rounded-lg bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div></div><div><label class="text-xs font-bold text-slate-500">Min Stock</label><input type="number" name="minStock" class="w-full border p-2 rounded-lg" value="0"></div><button class="w-full bg-primary text-white py-2 rounded-lg font-bold">บันทึก</button></form></div>` : ``;
+            const list = window.localData.items.map(i => `<tr class="border-b hover:bg-slate-50"><td class="py-3 px-4 font-bold text-primary">${i.code}</td><td>${i.name}</td><td class="text-center">${i.type}</td><td class="text-center text-slate-500">${i.unit}</td><td class="text-center">${can?`<button onclick="openEditItemModal('${i.id}')" class="text-slate-400 hover:text-blue-500 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-400 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>`:'-'}</td></tr>`).join('');
+            return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div>${form}</div><div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b"><tr><th class="py-3 px-4">รหัส</th><th>ชื่อ</th><th class="text-center">ประเภท</th><th class="text-center">หน่วย</th><th class="text-center">จัดการ</th></tr></thead><tbody>${list}</tbody></table></div></div>`;
         }
 
-        function renderReceiveForm() { return document.getElementById('search-container-receive-item') ? '' : `<div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-xl font-bold mb-6 text-slate-800 border-b border-slate-100 pb-4"><i class="fas fa-dolly text-primary mr-2"></i> บันทึกรับของเข้า (GR)</h3><form onsubmit="handleReceiveSubmit(event)" class="space-y-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">เลือกสินค้า</label>${renderSearchableItemInput('receive-item')}</div><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Lot No.</label><input name="lotNo" class="w-full border-slate-300 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">จำนวน</label><input type="number" name="qty" class="w-full border-slate-300 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none" required></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">หน่วย</label><select name="unit" class="w-full border-slate-300 border p-3 rounded-xl bg-white" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option></select></div></div></div><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-300 border p-3 rounded-xl" required></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Location</label><input name="location" class="w-full border-slate-300 border p-3 rounded-xl" required></div></div><button class="w-full bg-slate-800 hover:bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg transition-all">บันทึกรับของ</button></form></div>`; }
-        function renderQCTask() { const tasks = window.localData.stock.filter(s=>s.status==='WAIT_QC'); if(!tasks.length) return `<div class="text-center py-20 text-slate-400 flex flex-col items-center"><i class="fas fa-check-circle text-4xl text-emerald-200 mb-4"></i><p>ไม่มีงานรอตรวจสอบคุณภาพ</p></div>`; return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${tasks.map(s=>{ const i=window.localData.items.find(x=>x.id===s.itemId); return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all"><div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div><div class="flex justify-between mb-3 pl-3"><div><span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-bold">WAIT QC</span><h4 class="font-bold text-slate-800 mt-1">${i.code}</h4><p class="text-sm text-slate-500">${i.name}</p></div><div class="text-right"><span class="text-[10px] text-slate-400 uppercase font-bold">Exp Date</span><p class="text-xs font-bold text-red-500">${s.expDate}</p></div></div><div class="bg-slate-50 rounded-xl p-3 mb-4 text-sm mx-3"><div class="flex justify-between mb-1"><span class="text-slate-500">Lot</span><span class="font-mono font-bold">${s.lotNo}</span></div><div class="flex justify-between"><span class="text-slate-500">Qty</span><span class="font-bold text-slate-800">${s.qty} ${i.unit}</span></div></div><div class="flex gap-2 pl-3"><button onclick="qcAction('${s.id}','PASS','OK')" class="flex-1 border border-slate-200 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 py-2 rounded-lg text-sm font-bold transition-all">Pass</button><button onclick="qcAction('${s.id}','FAIL','NG')" class="flex-1 border border-slate-200 hover:bg-red-500 hover:text-white hover:border-red-500 py-2 rounded-lg text-sm font-bold transition-all">Reject</button></div></div>` }).join('')}</div>`; }
-        function renderIssueForm() { if(!window.appState.issueDate) window.appState.issueDate=new Date().toISOString().slice(0,16); const list=window.appState.issueCart.map((c,i)=>`<tr class="border-b border-slate-100 last:border-0"><td class="p-3 text-slate-400 font-mono text-xs">${i+1}</td><td class="p-3 font-bold text-primary">${c.item.code}</td><td class="p-3 text-slate-700">${c.item.name}</td><td class="p-3 text-right font-bold">${c.qty}</td><td class="p-3 text-center text-xs text-slate-400 uppercase">${c.item.unit}</td><td class="p-3 text-center"><button onclick="removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-times-circle text-lg"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto space-y-6"><div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">รายละเอียดการเบิก (Issue Details)</h3><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Ref Doc / Job No.</label><input id="input-ref-doc" class="w-full border-slate-300 border p-3 rounded-xl font-bold text-slate-800" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value" placeholder="เช่น JOB-001"></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Date</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-300 border p-3 rounded-xl" value="${window.appState.issueDate}" onchange="window.appState.issueDate=this.value"></div></div></div><div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-inner"><div class="flex flex-col md:flex-row gap-4 items-end"><div class="flex-grow w-full"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">ค้นหาสินค้า</label>${renderSearchableItemInput('issue-item')}</div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">จำนวน</label><input type="number" id="input-qty" class="w-full border-slate-300 border p-2.5 rounded-xl text-center font-bold" placeholder="0"></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-1 block">หน่วย</label><select id="input-unit" class="w-full border-slate-300 border p-2.5 rounded-xl bg-white"><option value="">-</option><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div><button onclick="handleAddIssueItem()" class="w-full md:w-auto bg-primary hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all">เพิ่มรายการ</button></div></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="px-6 py-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-600">รายการที่เลือก (${window.appState.issueCart.length})</div><table class="w-full text-sm text-left"><thead class="bg-white text-slate-500 border-b border-slate-100"><tr><th class="p-3 pl-4">#</th><th class="p-3">รหัส</th><th class="p-3">ชื่อ</th><th class="p-3 text-right">จำนวน</th><th class="p-3 text-center">หน่วย</th><th></th></tr></thead><tbody>${window.appState.issueCart.length > 0 ? list : '<tr><td colspan="6" class="py-10 text-center text-slate-400 italic">ยังไม่มีรายการสินค้า</td></tr>'}</tbody></table><div class="p-6 bg-slate-50 border-t border-slate-200 text-right"><button onclick="processIssueBatch()" class="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform active:scale-95" ${window.appState.issueCart.length === 0 ? 'disabled class="opacity-50 cursor-not-allowed bg-slate-800 text-white px-8 py-3 rounded-xl font-bold"' : ''}>ยืนยันการเบิกสินค้า</button></div></div></div>`; }
-        function renderHistory() { return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs"><tr><th class="p-4 pl-6">เวลา</th><th class="p-4">ประเภท</th><th class="p-4">สินค้า</th><th class="p-4">Lot</th><th class="p-4 text-right">จำนวน</th><th class="p-4">โดย</th><th class="p-4 pr-6">Note</th></tr></thead><tbody class="divide-y divide-slate-100">${window.localData.transactions.map(t=>`<tr class="hover:bg-slate-50 border-b last:border-0 transition-colors"><td class="p-3 pl-6 text-xs text-slate-500 font-mono">${t.date.split(' ')[1]}</td><td class="p-3 font-bold text-xs ${t.type.includes('RECEIVE')?'text-emerald-600':t.type.includes('ISS')?'text-primary':'text-amber-500'}">${t.type}</td><td class="p-3 text-slate-700 font-medium">${t.item}</td><td class="p-3 font-mono text-xs"><span class="bg-slate-100 px-2 py-1 rounded text-slate-600">${t.lot}</span></td><td class="p-3 text-right font-bold text-slate-800">${t.qty}</td><td class="p-3 text-xs text-slate-500 flex items-center gap-2"><div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[10px]">${t.actionBy.charAt(0)}</div>${t.actionBy.split(' ')[0]}</td><td class="p-3 pr-6 text-xs text-slate-400 italic">${t.note}</td></tr>`).join('')}</tbody></table></div>`; }
-        
-        document.getElementById('role-switcher').addEventListener('change', (e) => { 
-            const r = e.target.value; 
-            window.appState.currentUser = { name: r==='ADMIN'?'Admin':r==='QC'?'QC User':'Warehouse User', role: r }; 
-            renderView('dashboard'); 
-        });
+        function renderUserList() {
+            const list = window.localData.users.map(u => `<tr class="border-b hover:bg-slate-50"><td class="p-3">${u.username}</td><td class="p-3">${u.name}</td><td class="p-3"><span class="bg-slate-100 px-2 py-1 rounded text-xs font-bold">${u.role}</span></td><td class="p-3 text-center"><button onclick="deleteUser('${u.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded"><i class="fas fa-trash-alt"></i></button></td></tr>`).join('');
+            return `<div class="max-w-4xl mx-auto"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800">จัดการผู้ใช้งาน</h3><button onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้</button></div><div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b"><tr><th class="p-3">Username</th><th class="p-3">ชื่อ</th><th class="p-3">Role</th><th class="p-3 text-center">Action</th></tr></thead><tbody>${list}</tbody></table></div></div>`;
+        }
 
+        // Keep other renders (receive, qc, issue, history) simplified as before but ensuring full function availability...
+        function renderReceiveForm() { return document.getElementById('search-container-receive-item')?'':`<div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border"><h3 class="text-xl font-bold mb-6">รับของเข้า (GR)</h3><form onsubmit="handleReceiveSubmit(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500">สินค้า</label>${renderSearchableItemInput('receive-item')}</div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">Lot</label><input name="lotNo" class="w-full border p-2 rounded-lg" required></div><div><label class="text-xs font-bold text-slate-500">Qty</label><input type="number" name="qty" class="w-full border p-2 rounded-lg" required></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">Exp</label><input type="date" name="expDate" class="w-full border p-2 rounded-lg" required></div><div><label class="text-xs font-bold text-slate-500">Loc</label><input name="location" class="w-full border p-2 rounded-lg" required></div></div><button class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold">บันทึก</button></form></div>`; }
+        function renderQCTask() { const t=window.localData.stock.filter(s=>s.status==='WAIT_QC'); if(!t.length)return `<div class="text-center py-20 text-slate-400">ไม่มีงานรอตรวจ</div>`; return `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">${t.map(s=>{const i=window.localData.items.find(x=>x.id==s.itemId); return `<div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-amber-400"><div class="flex justify-between"><h4>${i.code}</h4><span class="text-xs text-red-500 font-bold">Exp: ${s.expDate}</span></div><div class="text-sm text-slate-500 mb-2">Lot: ${s.lotNo} | Qty: ${s.qty}</div><div class="flex gap-2"><button onclick="qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-50 text-emerald-700 py-1 rounded text-sm">Pass</button><button onclick="qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-700 py-1 rounded text-sm">Reject</button></div></div>`}).join('')}</div>`; }
+        function renderIssueForm() { if(!window.appState.issueDate)window.appState.issueDate=new Date().toISOString().slice(0,16); const l=window.appState.issueCart.map((c,i)=>`<tr class="border-b"><td class="p-3 font-bold text-primary">${c.item.code}</td><td class="p-3">${c.item.name}</td><td class="p-3 text-right font-bold">${c.qty}</td><td class="p-3 text-center"><button onclick="removeFromIssueCart(${i})" class="text-red-500"><i class="fas fa-times"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto space-y-6"><div class="bg-white p-6 rounded-2xl shadow-sm border"><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">Ref Doc</label><input id="input-ref-doc" class="w-full border p-2 rounded-lg font-bold" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value"></div><div><label class="text-xs font-bold text-slate-500">Date</label><input type="datetime-local" id="input-issue-date" class="w-full border p-2 rounded-lg" value="${window.appState.issueDate}" onchange="window.appState.issueDate=this.value"></div></div></div><div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex gap-4 items-end"><div class="flex-grow"><div><label class="text-xs font-bold text-indigo-400">สินค้า</label>${renderSearchableItemInput('issue-item')}</div></div><div class="w-32"><label class="text-xs font-bold text-indigo-400">จำนวน</label><input type="number" id="input-qty" class="w-full border p-2 rounded-lg font-bold text-center"></div><div class="w-24"><label class="text-xs font-bold text-indigo-400">หน่วย</label><select id="input-unit" class="w-full border p-2 rounded-lg bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div><button onclick="handleAddIssueItem()" class="bg-primary text-white px-6 py-2 rounded-lg font-bold shadow">เพิ่ม</button></div><div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b"><tr><th class="p-3">รหัส</th><th class="p-3">ชื่อ</th><th class="p-3 text-right">จำนวน</th><th></th></tr></thead><tbody>${l}</tbody></table><div class="p-4 border-t text-right"><button onclick="processIssueBatch()" class="bg-slate-800 text-white px-8 py-2 rounded-lg font-bold shadow-lg">ยืนยัน</button></div></div></div>`; }
+        function renderHistory() { return `<div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-50 border-b"><tr><th class="p-4">เวลา</th><th class="p-4">ประเภท</th><th class="p-4">สินค้า</th><th class="p-4">Lot</th><th class="p-4 text-right">จำนวน</th><th class="p-4">โดย</th><th class="p-4">Note</th></tr></thead><tbody>${window.localData.transactions.map(t=>`<tr class="border-b hover:bg-slate-50"><td class="p-3 text-xs text-slate-500 font-mono">${t.date.split(' ')[1]}</td><td class="p-3 font-bold text-xs ${t.type.includes('REC')?'text-emerald-600':t.type.includes('ISS')?'text-primary':'text-amber-500'}">${t.type}</td><td class="p-3">${t.item}</td><td class="p-3 font-mono text-xs bg-slate-100 rounded w-fit px-2">${t.lot}</td><td class="p-3 text-right font-bold">${t.qty}</td><td class="p-3 text-xs text-slate-500">${t.actionBy}</td><td class="p-3 text-xs text-slate-400">${t.note}</td></tr>`).join('')}</tbody></table></div>`; }
     </script>
 </body>
 </html>
