@@ -271,7 +271,7 @@
         window.alertSuccess = (m) => alert("✅ " + m); 
         window.alertError = (m) => alert("❌ " + m);
 
-        // --- NEW: EXCEL IMPORT LOGIC ---
+        // --- EXCEL IMPORT LOGIC ---
         window.handleExcelImport = function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -289,7 +289,6 @@
 
                     let successCount = 0;
                     for (const row of jsonData) {
-                        // Map Excel columns to our format
                         const item = {
                             code: (row["รหัส"] || row["Code"] || "").toString().trim(),
                             name: (row["ชื่อ"] || row["Name"] || "").toString().trim(),
@@ -299,16 +298,15 @@
                         };
 
                         if (item.code && item.name) {
-                            // Check for duplicates
                             if (!window.localData.items.find(x => x.code === item.code)) {
-                                await window.createItem(item, true); // true = silent mode
+                                await window.createItem(item, true); 
                                 successCount++;
                             }
                         }
                     }
 
                     alertSuccess(`นำเข้าข้อมูลสำเร็จ ${successCount} รายการ`);
-                    event.target.value = ''; // Reset input
+                    event.target.value = ''; 
                 } catch (err) {
                     console.error(err);
                     alertError("เกิดข้อผิดพลาดในการประมวลผลไฟล์: " + err.message);
@@ -345,7 +343,7 @@
                         <thead>
                             <tr>
                                 <th>รหัสสินค้า</th>
-                                <th style="text-align: left;">ชื่อสินค้า</th>
+                                <th>ชื่อสินค้า</th>
                                 <th>ยอดในระบบ</th>
                                 <th>หน่วย</th>
                                 <th>นับจริง</th>
@@ -354,10 +352,10 @@
                         <tbody>
                             ${printData.map(item => `
                                 <tr>
-                                    <td class="font-mono text-center">${item.code}</td>
-                                    <td>${item.name}</td>
-                                    <td class="text-center">${item.balance}</td>
-                                    <td class="text-center">${item.unit}</td>
+                                    <td class="font-mono" style="text-align: left;">${item.code}</td>
+                                    <td style="text-align: left;">${item.name}</td>
+                                    <td style="text-align: center;">${item.balance}</td>
+                                    <td style="text-align: center;">${item.unit}</td>
                                     <td class="check-box"></td>
                                 </tr>
                             `).join('')}
@@ -379,7 +377,7 @@
                 .print-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                 .print-table th, .print-table td { border: 1px solid #000; padding: 6px 4px; }
                 .print-table th { background-color: #f5f5f5 !important; font-weight: bold; text-align: center; }
-                .text-center { text-align: center; } .font-mono { font-family: monospace; } .check-box { width: 100px; }
+                .check-box { width: 100px; }
                 .footer { margin-top: 30px; display: flex; justify-content: space-around; } .sig-box { text-align: center; }
                 @media print { .header { -webkit-print-color-adjust: exact; } th { background-color: #f5f5f5 !important; -webkit-print-color-adjust: exact; } }
                 </style></head><body>${html}</body></html>
@@ -632,6 +630,8 @@
             window.localData.stock.forEach(s=>{ if(s.qty>0){ const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(it){ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; } } });
             const recentTrans = window.localData.transactions.slice(0, 5);
             const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+
             return `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     ${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}
@@ -639,44 +639,45 @@
                     ${card('รอตรวจสอบ QC',qc,'fa-microscope','text-amber-500','bg-amber-50 text-amber-500')}
                     ${card('พร้อมเบิก (Lot)',avail,'fa-cubes','text-emerald-600','bg-emerald-50 text-emerald-600')}
                 </div>
-                <div class="space-y-8">
+                <div class="space-y-8 text-center">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-red-50/30">
-                            <h3 class="font-bold text-slate-800"><i class="fas fa-bullhorn text-red-500 mr-2"></i> สินค้าที่ต้องสั่งเพิ่ม (Low Stock)</h3>
+                            <h3 class="font-bold text-slate-800 text-center flex-1 ml-10">สินค้าที่ต้องสั่งเพิ่ม (Low Stock)</h3>
                             <span class="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full">${low} รายการ</span>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase"><tr><th class="px-6 py-3 text-center">รหัสสินค้า</th><th class="px-6 py-3 text-center">ชื่อสินค้า</th><th class="px-6 py-3 text-center">คงเหลือ</th><th class="px-6 py-3 text-center">ค่า Min</th><th class="px-6 py-3 text-center">หน่วย</th></tr></thead><tbody>
-                        ${lowStockItems.slice(0, 5).map(i => `<tr class="border-b border-slate-50 hover:bg-red-50/30 transition-colors"><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-center">${i.code}</td><td class="px-6 py-4 font-medium text-slate-700 text-center">${i.name}</td><td class="px-6 py-4 text-center text-red-600 font-bold">${i.currentStock.toFixed(2)}</td><td class="px-6 py-4 text-center text-slate-400 font-mono text-center">${i.minStock}</td><td class="px-6 py-4 text-center text-xs uppercase text-slate-400 text-center">${i.unit}</td></tr>`).join('')}
+                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6">รหัสสินค้า</th><th class="py-3 px-6 text-left">ชื่อสินค้า</th><th class="py-3 px-6">คงเหลือ</th><th class="py-3 px-6">ค่า Min</th><th class="py-3 px-6">หน่วย</th></tr></thead><tbody>
+                        ${lowStockItems.slice(0, 5).map(i => `<tr class="border-b border-slate-50 hover:bg-red-50/30 transition-colors text-center"><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${i.code}</td><td class="px-6 py-4 font-medium text-slate-700 text-left">${i.name}</td><td class="px-6 py-4 text-red-600 font-bold">${i.currentStock.toFixed(2)}</td><td class="px-6 py-4 text-slate-400 font-mono">${i.minStock}</td><td class="px-6 py-4 text-xs uppercase text-slate-400">${i.unit}</td></tr>`).join('')}
                         ${lowStockItems.length === 0 ? '<tr><td colspan="5" class="px-6 py-10 text-center text-emerald-500 italic">สต็อกสินค้าเพียงพอทุกรายการ</td></tr>' : ''}
                         </tbody></table></div>
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <h3 class="font-bold text-slate-800"><i class="fas fa-history text-indigo-500 mr-2"></i> ความเคลื่อนไหวล่าสุด (Recent Activities)</h3>
-                            <button onclick="renderView('history')" class="text-xs font-bold text-primary hover:underline">ดูประวัติทั้งหมด</button>
+                            <h3 class="font-bold text-slate-800 text-center flex-1 ml-10">ความเคลื่อนไหวล่าสุด (Recent Activities)</h3>
+                            <button onclick="renderView('history')" class="text-xs font-bold text-primary hover:underline">ดูทั้งหมด</button>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase"><tr><th class="px-6 py-3 text-center">เวลา</th><th class="px-6 py-3 text-center">ประเภท</th><th class="px-6 py-3 text-center">รหัสสินค้า</th><th class="px-6 py-3 text-center">ชื่อสินค้า</th><th class="px-6 py-3 text-center">จำนวน</th><th class="px-6 py-3 text-center">ผู้ดำเนินการ</th></tr></thead><tbody>
+                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6">เวลา</th><th class="py-3 px-6">ประเภท</th><th class="py-3 px-6">รหัสสินค้า</th><th class="py-3 px-6 text-left">ชื่อสินค้า</th><th class="py-3 px-6">จำนวน</th><th class="py-3 px-6">โดย</th></tr></thead><tbody>
                         ${recentTrans.map(t => { const itemSplit = t.item.split(' - '), code = itemSplit[0] || '-', name = itemSplit[1] || '-', displayType = typeMap[t.type] || t.type;
-                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"><td class="px-6 py-4 text-xs text-slate-400 font-mono text-center">${t.date.split(' ')[1]}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono text-indigo-600 font-bold text-center">${code}</td><td class="px-6 py-4 text-slate-700 text-center">${name}</td><td class="px-6 py-4 text-center font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-xs text-slate-500 text-center">${t.actionBy}</td></tr>` }).join('')}
+                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs"><td class="px-6 py-4 text-slate-400 font-mono">${t.date.split(' ')[1]}</td><td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono text-indigo-600 font-bold text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-slate-500">${t.actionBy}</td></tr>` }).join('')}
                         ${recentTrans.length === 0 ? '<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">ยังไม่มีข้อมูลรายการ</td></tr>' : ''}
                         </tbody></table></div>
                     </div>
                 </div>`;
         }
-        function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2">${t}</p><h3 class="text-3xl font-bold ${tc}">${v.toLocaleString()}</h3></div><div class="p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
+        function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex flex-col items-center"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2 text-center w-full">${t}</p><h3 class="text-3xl font-bold ${tc} text-center">${v.toLocaleString()}</h3></div><div class="mt-3 p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
 
         function renderInventoryStatus() {
             const currentFilter = window.appState.inventoryFilter, isLowStockOnly = window.appState.inventoryLowStockOnly;
             let filteredItems = window.localData.items;
             if (currentFilter !== 'ALL') filteredItems = filteredItems.filter(i => i.type === currentFilter);
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
             const rows = filteredItems.map(i => {
                 const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), tot=s.reduce((a,b)=>a+b.qty,0), av=s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0), qc=s.filter(x=>x.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
                 const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
                 if (isLowStockOnly && !isLow) return null;
                 const active = s.filter(x=>x.qty>0); let ag = '<span class="text-slate-300">-</span>';
-                if(active.length){ const old=active.sort((a,b)=>new Date(a.receivedDate)-new Date(b.receivedDate))[0]; if(old&&old.receivedDate){ const d=Math.floor((new Date()-new Date(old.receivedDate))/86400000); ag=`<span class="px-2 py-0.5 rounded text-xs border ${d<=30?'bg-emerald-50 text-emerald-700 border-emerald-100':'bg-red-50 text-red-700 border-red-100'}">${d} วัน</span>`; } }
+                if(active.length){ const old=active.sort((a,b)=>new Date(a.receivedDate)-new Date(b.receivedDate))[0]; if(old&&old.receivedDate){ const d=Math.floor((new Date()-new Date(old.receivedDate))/86400000); ag=`<span class="px-2 py-0.5 rounded text-[10px] border ${d<=30?'bg-emerald-50 text-emerald-700 border-emerald-100':'bg-red-50 text-red-700 border-red-100'}">${d} วัน</span>`; } }
                 const cls = checkPerm('manage_item')?'text-slate-400 hover:text-primary':'text-slate-200 cursor-not-allowed';
-                return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row" data-search="${i.code.toLowerCase()} ${i.name.toLowerCase()}"><td class="py-3 px-6 text-center font-bold text-indigo-600 font-mono">${i.code}</td><td class="py-3 px-6 text-center text-slate-700">${i.name}</td><td class="py-3 px-6 text-center text-xs"><span class="bg-slate-100 px-2 py-1 rounded">${i.type}</span></td><td class="py-3 px-6 text-center">${i.minStock||0}</td><td class="py-3 px-6 text-center">${ag}</td><td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center text-xs text-slate-400 uppercase">${i.unit}</td><td class="py-3 px-6 text-center font-bold text-emerald-600">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center font-bold text-amber-500">${qc>0?qc.toLocaleString():'-'}</td><td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${i.id}')" class="${cls}"><i class="fas fa-cog"></i></button></td></tr>`;
+                return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row"><td class="py-3 px-6 text-left font-bold text-indigo-600 font-mono">${i.code}</td><td class="py-3 px-6 text-left text-slate-700 font-medium">${i.name}</td><td class="py-3 px-6 text-center text-[10px]"><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded font-bold">${i.type}</span></td><td class="py-3 px-6 text-center text-slate-400">${i.minStock||0}</td><td class="py-3 px-6 text-center">${ag}</td><td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center text-[10px] text-slate-400 uppercase">${i.unit}</td><td class="py-3 px-6 text-center font-bold text-emerald-600">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td><td class="py-3 px-6 text-center font-bold text-amber-500">${qc>0?qc.toLocaleString():'-'}</td><td class="py-3 px-6 text-center"><button onclick="openMinStockModal('${i.id}')" class="${cls}"><i class="fas fa-cog"></i></button></td></tr>`;
             }).filter(row => row !== null).join('');
             const getCount = (type) => window.localData.items.filter(i => type === 'ALL' || i.type === type).length;
             const lowStockCount = window.localData.items.filter(i => { const tot = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)).reduce((a,b)=>a+b.qty,0); return tot <= (i.minStock || 0) && (i.minStock || 0) > 0; }).length;
@@ -712,7 +713,7 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[500px] flex flex-col">
                         <div class="flex-1 overflow-auto custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse" id="inventory-table">
-                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10"><tr><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">Min</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">Aging</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">คงเหลือ</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">หน่วย</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">พร้อมใช้</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">รอ QC</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ตั้งค่า</th></tr></thead>
+                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center"><tr><th class="py-4 px-6 uppercase text-[11px] font-bold text-slate-500">รหัส</th><th class="py-4 px-6 uppercase text-[11px] font-bold text-slate-500 text-left">ชื่อสินค้า</th><th class="uppercase text-[11px] font-bold text-slate-500">ประเภท</th><th class="uppercase text-[11px] font-bold text-slate-500">Min</th><th class="uppercase text-[11px] font-bold text-slate-500">Aging</th><th class="uppercase text-[11px] font-bold text-slate-500">คงเหลือ</th><th class="uppercase text-[11px] font-bold text-slate-500">หน่วย</th><th class="uppercase text-[11px] font-bold text-slate-500">พร้อมใช้</th><th class="uppercase text-[11px] font-bold text-slate-500">รอ QC</th><th class="uppercase text-[11px] font-bold text-slate-500">ตั้งค่า</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                             ${rows === '' ? '<div class="p-20 text-center flex flex-col items-center gap-3"><i class="fas fa-magnifying-glass text-4xl text-slate-200"></i><p class="text-slate-400 italic">ไม่พบข้อมูลสินค้าที่คุณกำลังค้นหา</p></div>' : ''}
@@ -723,30 +724,80 @@
 
         function renderItemMaster() {
             const can = checkPerm('manage_item');
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+            const getCount = (type) => window.localData.items.filter(i => i.type === type).length;
+            
             const form = can ? `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-24">
-                    <h3 class="font-bold mb-4 text-slate-800 flex items-center"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้า</h3>
-                    <form onsubmit="handleCreateItem(event)" class="space-y-4">
-                        <div><label class="text-xs font-bold text-slate-500">รหัส</label><input name="code" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
-                        <div><label class="text-xs font-bold text-slate-500">ชื่อ</label><input name="name" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-xs font-bold text-slate-500">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
-                            <div><label class="text-xs font-bold text-slate-500">หน่วย</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
-                        </div>
-                        <div><label class="text-xs font-bold text-slate-500">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" value="0"></div>
-                        <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">บันทึกสินค้า</button>
-                    </form>
-                    <div class="mt-8 pt-6 border-t border-slate-100">
-                        <label class="text-xs font-bold text-slate-400 block mb-3 uppercase">นำเข้าข้อมูลจำนวนมาก</label>
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="font-bold mb-4 text-slate-800 flex items-center"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้าใหม่</h3>
+                        <form onsubmit="handleCreateItem(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 gap-4">
+                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">รหัสสินค้า</label><input name="code" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น RM-001" required></div>
+                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ชื่อสินค้า</label><input name="name" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น แป้งสาลี" required></div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
+                                    <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยหลัก</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
+                                </div>
+                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" value="0"></div>
+                            </div>
+                            <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all transform active:scale-95">บันทึกข้อมูลสินค้า</button>
+                        </form>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูล (Bulk)</h3>
+                        <p class="text-[11px] text-slate-400 mb-4 leading-relaxed">คุณสามารถนำเข้าข้อมูลสินค้าหลายรายการพร้อมกันผ่านไฟล์ Excel (.xlsx) โดยใช้หัวตาราง: รหัส, ชื่อ, ประเภท, หน่วย</p>
                         <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
-                        <button onclick="document.getElementById('excel-file-input').click()" class="w-full bg-white text-emerald-600 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all">
-                            <i class="fas fa-file-excel text-lg"></i> นำเข้าจาก Excel
+                        <button onclick="document.getElementById('excel-file-input').click()" class="w-full bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all transform active:scale-95 text-sm">
+                            <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
                         </button>
-                        <p class="text-[10px] text-slate-400 mt-2 text-center">* หัวคอลัมน์: รหัส, ชื่อ, ประเภท, หน่วย, Min Stock</p>
                     </div>
                 </div>` : ``;
-            const list = window.localData.items.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors"><td class="py-3 px-4 font-bold text-primary text-center font-mono">${i.code}</td><td class="text-center font-medium">${i.name}</td><td class="text-center text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded font-bold">${i.type}</span></td><td class="text-center text-slate-500 uppercase text-center">${i.unit}</td><td class="text-center">${can?`<button onclick="openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 mr-2 transition-colors"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-trash-alt"></i></button>`:'-'}</td></tr>`).join('');
-            return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div>${form}</div><div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b"><tr><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">หน่วย</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">จัดการ</th></tr></thead><tbody>${list}</tbody></table></div></div>`;
+
+            const stats = `
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Raw Material</span><span class="text-xl font-bold text-emerald-600">${getCount('RM')}</span></div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Packaging</span><span class="text-xl font-bold text-amber-600">${getCount('PKG')}</span></div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Finished Goods</span><span class="text-xl font-bold text-indigo-600">${getCount('FG')}</span></div>
+                </div>
+            `;
+
+            const list = window.localData.items.map(i => `
+                <tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm">
+                    <td class="py-3 px-4 font-bold text-primary text-left font-mono">${i.code}</td>
+                    <td class="text-left font-medium text-slate-700">${i.name}</td>
+                    <td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td>
+                    <td class="text-slate-500 uppercase font-bold text-[10px]">${i.unit}</td>
+                    <td class="text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+
+            return `
+                <div class="max-w-7xl mx-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <div class="lg:col-span-1">${form}</div>
+                        <div class="lg:col-span-3">
+                            ${stats}
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
+                                <div class="px-6 py-4 border-b border-slate-50 bg-slate-50/30">
+                                    <h3 class="font-bold text-slate-800">รายการสินค้าทั้งหมดในระบบ (${window.localData.items.length})</h3>
+                                </div>
+                                <div class="flex-1 overflow-auto custom-scrollbar">
+                                    <table class="w-full text-sm text-left border-collapse">
+                                        <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold">
+                                            <tr><th class="py-4 px-6 text-left border-b">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">หน่วย</th><th class="border-b">จัดการ</th></tr>
+                                        </thead>
+                                        <tbody>${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic">ยังไม่มีข้อมูลสินค้าในระบบ</td></tr>'}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
         }
 
         function renderReceiveForm() { return document.getElementById('search-container-receive-item')?'':`<div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-xl font-bold mb-6 text-center border-b pb-4 text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3><form onsubmit="handleReceiveSubmit(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500 uppercase">เลือกสินค้าที่รับเข้า</label>${renderSearchableItemInput('receive-item')}</div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">Lot No. (เลขล็อต)</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div><div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none" step="0.01" required></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">วันหมดอายุ (Expiry)</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div><div><label class="text-xs font-bold text-slate-500">Location (ที่จัดเก็บ)</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div></div><button class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button></form></div>`; }
@@ -754,21 +805,17 @@
             const t=window.localData.stock.filter(s=>s.status==='WAIT_QC'&&s.qty>0); 
             if(!t.length)return `<div class="text-center py-20 flex flex-col items-center gap-4"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 text-3xl border border-slate-100"><i class="fas fa-clipboard-check"></i></div><p class="text-slate-400 italic font-medium">ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ</p></div>`; 
             return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${t.map(s=>{ const i=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(!i)return ''; 
-                return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all"><div class="mb-4"><div class="flex justify-between items-start gap-2"><h4 class="font-bold text-indigo-600 font-mono">${i.code}</h4><span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100">Exp: ${s.expDate}</span></div><div class="text-sm font-bold text-slate-700 mt-2">${i.name}</div><div class="mt-3 grid grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-400 block mb-0.5">จำนวน</span><span class="font-bold text-slate-600">${s.qty.toLocaleString()} ${i.unit}</span></div></div></div><div class="flex gap-2 pt-2">
-                    <button onclick="qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors">Pass</button>
-                    <button onclick="qcAction('${s.id}','HOLD','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition-colors">Hold</button>
-                    <button onclick="qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-600 py-2.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors">Reject</button>
-                </div></div>`}).join('')}</div>`; 
+                return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all"><div class="mb-4"><div class="flex justify-between items-start gap-2"><h4 class="font-bold text-indigo-600 font-mono">${i.code}</h4><span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100">Exp: ${s.expDate}</span></div><div class="text-sm font-bold text-slate-700 mt-2">${i.name}</div><div class="mt-3 grid grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-400 block mb-0.5">จำนวน</span><span class="font-bold text-slate-600">${s.qty.toLocaleString()} ${i.unit}</span></div></div></div><div class="flex gap-2 pt-2"><button onclick="qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors">Pass</button><button onclick="qcAction('${s.id}','HOLD','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition-colors">Hold</button><button onclick="qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-600 py-2.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors">Reject</button></div></div>`}).join('')}</div>`; 
         }
         
         function renderIssueForm() { 
             const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset()); window.appState.issueDate=now.toISOString().slice(0,16); 
-            const l=window.appState.issueCart.map((c,i)=>`<tr class="border-b transition-colors hover:bg-slate-50/30"><td class="p-3 font-bold text-primary text-center font-mono">${c.item.code}</td><td class="p-3 text-center font-medium">${c.item.name}</td><td class="p-3 text-center"><div class="font-bold text-slate-700">${c.displayQty} ${c.displayUnit}</div><div class="text-[10px] text-slate-400 italic">(= ${c.baseQty.toFixed(3)} ${c.unit})</div></td><td class="p-3 text-center"><button onclick="removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); 
-            return `<div class="max-w-4xl mx-auto space-y-6"><div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Ref Doc (เลขอ้างอิงใบสั่งงาน)</label><input id="input-ref-doc" class="w-full border-slate-200 border p-3 rounded-xl font-bold placeholder-slate-300 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น JOB-2024-001" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value"></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">วันที่เบิก (ระบบบันทึกอัตโนมัติ)</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-200 border p-3 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" value="${window.appState.issueDate}" disabled></div></div></div><div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 items-end"><div class="flex-grow w-full"><div><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">ระบุสินค้าที่ต้องการเบิก</label>${renderSearchableItemInput('issue-item')}</div></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">จำนวน</label><input type="number" id="input-qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold text-center focus:ring-2 focus:ring-primary outline-none" step="0.01"></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">หน่วยเบิก</label><select id="input-unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="kg">kg</option><option value="g">g</option><option value="pcs">pcs</option><option value="ml">ml</option></select></div><button onclick="handleAddIssueItem()" class="w-full md:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95">เพิ่มในรายการ</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b"><tr><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">จำนวนที่เบิก</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">Action</th></tr></thead><tbody>${l.length?l:'<tr><td colspan="4" class="p-16 text-center flex flex-col items-center gap-2"><i class="fas fa-cart-shopping text-slate-100 text-5xl"></i><span class="text-slate-400 italic">ยังไม่มีสินค้าในรายการเบิก</span></td></tr>'}</tbody></table><div class="p-6 border-t text-right bg-slate-50/30"><button onclick="processIssueBatch()" class="bg-slate-800 text-white px-10 py-3.5 rounded-xl font-bold shadow-lg hover:bg-dark transition-all transform active:scale-95 ${!l.length?'opacity-50 cursor-not-allowed':''}" ${!l.length?'disabled':''}>ยืนยันการเบิกจ่ายสินค้า</button></div></div></div>`; 
+            const l=window.appState.issueCart.map((c,i)=>`<tr class="border-b transition-colors hover:bg-slate-50/30 text-center text-sm font-medium"><td class="p-3 font-bold text-primary text-left font-mono">${c.item.code}</td><td class="p-3 text-left font-medium text-slate-700">${c.item.name}</td><td class="p-3 text-center"><div class="font-bold text-slate-700">${c.displayQty} ${c.displayUnit}</div><div class="text-[10px] text-slate-400 italic">(= ${c.baseQty.toFixed(3)} ${c.unit})</div></td><td class="p-3 text-center"><button onclick="removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); 
+            return `<div class="max-w-4xl mx-auto space-y-6"><div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div class="grid grid-cols-2 gap-6"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Ref Doc (เลขอ้างอิงใบสั่งงาน)</label><input id="input-ref-doc" class="w-full border-slate-200 border p-3 rounded-xl font-bold placeholder-slate-300 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น JOB-2024-001" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value"></div><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block">วันที่เบิก (ระบบบันทึกอัตโนมัติ)</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-200 border p-3 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" value="${window.appState.issueDate}" disabled></div></div></div><div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 items-end"><div class="flex-grow w-full"><div><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">ระบุสินค้าที่ต้องการเบิก</label>${renderSearchableItemInput('issue-item')}</div></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">จำนวน</label><input type="number" id="input-qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold text-center focus:ring-2 focus:ring-primary outline-none" step="0.01"></div><div class="w-full md:w-32"><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block">หน่วยเบิก</label><select id="input-unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="kg">kg</option><option value="g">g</option><option value="pcs">pcs</option><option value="ml">ml</option></select></div><button onclick="handleAddIssueItem()" class="w-full md:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95">เพิ่มในรายการ</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left">รหัส</th><th class="text-left">ชื่อสินค้า</th><th>จำนวนที่เบิก</th><th>Action</th></tr></thead><tbody>${l.length?l:'<tr><td colspan="4" class="p-16 text-center flex flex-col items-center gap-2"><i class="fas fa-cart-shopping text-slate-100 text-5xl"></i><span class="text-slate-400 italic">ยังไม่มีสินค้าในรายการเบิก</span></td></tr>'}</tbody></table><div class="p-6 border-t text-right bg-slate-50/30"><button onclick="processIssueBatch()" class="bg-slate-800 text-white px-10 py-3.5 rounded-xl font-bold shadow-lg hover:bg-dark transition-all transform active:scale-95 ${!l.length?'opacity-50 cursor-not-allowed':''}" ${!l.length?'disabled':''}>ยืนยันการเบิกจ่ายสินค้า</button></div></div></div>`; 
         }
 
-        function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors"><td class="p-4 text-center font-mono text-slate-600">${u.username}</td><td class="p-4 text-center font-bold text-slate-700">${u.name}</td><td class="p-4 text-center"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4 text-center"><button onclick="deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b"><tr><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">Username</th><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อพนักงาน</th><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">ตำแหน่ง (Role)</th><th class="p-4 text-center font-bold text-slate-500 uppercase text-[11px]">Action</th></tr></thead><tbody>${list}</tbody></table></div></div>`; }
-        function renderHistory() { const isAdmin = window.appState.currentUser.role === 'ADMIN', typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10"><tr><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">เวลา</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">สินค้า</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">Lot</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">จำนวน</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">โดย</th><th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">Note</th>${isAdmin ? '<th class="py-4 px-4 text-center font-bold text-slate-500 uppercase text-[11px]">ลบ</th>' : ''}</tr></thead><tbody>${window.localData.transactions.map(t => `<tr class="border-b hover:bg-slate-50 transition-colors"><td class="p-3 text-[10px] text-slate-400 font-mono text-center">${t.date}</td><td class="p-3 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${typeMap[t.type]||t.type}</span></td><td class="p-3 text-center font-medium text-slate-700 text-xs">${t.item || 'Unknown'}</td><td class="p-3 font-mono text-[10px] text-center"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td><td class="p-3 text-center font-bold text-xs ${t.qty<0?'text-red-500':'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="p-3 text-[10px] text-slate-500 text-center">${t.actionBy}</td><td class="p-3 text-[10px] text-slate-400 text-center">${t.note}</td>${isAdmin ? `<td class="p-3 text-center"><button onclick="deleteTransaction('${t.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-2"><i class="fas fa-trash-can"></i></button></td>` : ''}</tr>`).join('')}</tbody></table></div>`; }
+        function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td class="p-4 text-left font-mono text-slate-600">${u.username}</td><td class="p-4 text-left font-bold text-slate-700">${u.name}</td><td class="p-4"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4"><button onclick="deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left">Username</th><th class="text-left">ชื่อพนักงาน</th><th>ตำแหน่ง (Role)</th><th>Action</th></tr></thead><tbody>${list}</tbody></table></div></div>`; }
+        function renderHistory() { const isAdmin = window.appState.currentUser.role === 'ADMIN', typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-4">เวลา</th><th>ประเภท</th><th class="text-left">สินค้า</th><th>Lot</th><th>จำนวน</th><th>โดย</th><th>Note</th>${isAdmin ? '<th>ลบ</th>' : ''}</tr></thead><tbody>${window.localData.transactions.map(t => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-xs"><td class="p-3 text-[10px] text-slate-400 font-mono">${t.date}</td><td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${typeMap[t.type]||t.type}</span></td><td class="p-3 text-left font-medium text-slate-700">${t.item || 'Unknown'}</td><td class="p-3 font-mono text-[10px]"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td><td class="p-3 font-bold ${t.qty<0?'text-red-500':'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="p-3 text-[10px] text-slate-500">${t.actionBy}</td><td class="p-3 text-[10px] text-slate-400">${t.note}</td>${isAdmin ? `<td class="p-3"><button onclick="deleteTransaction('${t.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-2"><i class="fas fa-trash-can"></i></button></td>` : ''}</tr>`).join('')}</tbody></table></div>`; }
     </script>
 </body>
 </html>
