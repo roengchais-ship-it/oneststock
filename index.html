@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel Import -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -234,6 +236,9 @@
         </div>
     </div>
 
+    <!-- Hidden Printable Area -->
+    <div id="printable-area" class="hidden p-8"></div>
+
     <!-- SCRIPT 1: STATE & UI HELPERS -->
     <script>
         window.localData = { items: [], stock: [], transactions: [], users: [] };
@@ -247,7 +252,6 @@
             inventoryLowStockOnly: false
         };
 
-        // --- CORE UI FUNCTIONS ---
         window.openProfileModal = function() {
             const u = window.appState.currentUser;
             if(!u) return;
@@ -267,7 +271,52 @@
         window.alertSuccess = (m) => alert("✅ " + m); 
         window.alertError = (m) => alert("❌ " + m);
 
-        // --- UPDATED: PRINT PDF WITH 0.5cm MARGINS ---
+        // --- NEW: EXCEL IMPORT LOGIC ---
+        window.handleExcelImport = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
+
+                    let successCount = 0;
+                    for (const row of jsonData) {
+                        // Map Excel columns to our format
+                        const item = {
+                            code: (row["รหัส"] || row["Code"] || "").toString().trim(),
+                            name: (row["ชื่อ"] || row["Name"] || "").toString().trim(),
+                            type: (row["ประเภท"] || row["Type"] || "RM").toString().trim().toUpperCase(),
+                            unit: (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase(),
+                            minStock: parseInt(row["Min Stock"] || row["Min"] || 0)
+                        };
+
+                        if (item.code && item.name) {
+                            // Check for duplicates
+                            if (!window.localData.items.find(x => x.code === item.code)) {
+                                await window.createItem(item, true); // true = silent mode
+                                successCount++;
+                            }
+                        }
+                    }
+
+                    alertSuccess(`นำเข้าข้อมูลสำเร็จ ${successCount} รายการ`);
+                    event.target.value = ''; // Reset input
+                } catch (err) {
+                    console.error(err);
+                    alertError("เกิดข้อผิดพลาดในการประมวลผลไฟล์: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
         window.printStockCheckSheet = function() {
             const currentFilter = window.appState.inventoryFilter;
             const isLowOnly = window.appState.inventoryLowStockOnly;
@@ -286,7 +335,6 @@
             if (printData.length === 0) return alertError("ไม่มีข้อมูลสำหรับพิมพ์");
 
             const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            
             const html = `
                 <div class="print-container">
                     <div class="header">
@@ -316,89 +364,28 @@
                         </tbody>
                     </table>
                     <div class="footer">
-                        <div class="sig-box">
-                            <p>__________________________</p>
-                            <p>( ผู้ตรวจนับ )</p>
-                        </div>
-                        <div class="sig-box">
-                            <p>__________________________</p>
-                            <p>( ผู้รับรอง/Admin )</p>
-                        </div>
+                        <div class="sig-box"><p>__________________________</p><p>( ผู้ตรวจนับ )</p></div>
+                        <div class="sig-box"><p>__________________________</p><p>( ผู้รับรอง/Admin )</p></div>
                     </div>
                 </div>
             `;
 
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
-                <html>
-                <head>
-                    <title>พิมพ์ใบตรวจนับสต็อก</title>
-                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-                    <style>
-                        @page {
-                            size: A4;
-                            margin: 0.5cm; /* ปรับขอบเป็น 0.5 ซม. ตามที่ต้องการ */
-                        }
-                        body {
-                            font-family: 'Sarabun', sans-serif;
-                            margin: 0;
-                            padding: 0;
-                            color: #333;
-                            font-size: 12px;
-                        }
-                        .print-container {
-                            padding: 10px;
-                        }
-                        .header {
-                            text-align: center;
-                            margin-bottom: 15px;
-                            border-bottom: 2px solid #000;
-                            padding-bottom: 10px;
-                        }
-                        .header h1 { margin: 0; font-size: 20px; }
-                        .header p { margin: 5px 0; font-size: 12px; color: #555; }
-                        .print-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-bottom: 20px;
-                        }
-                        .print-table th, .print-table td {
-                            border: 1px solid #000;
-                            padding: 6px 4px;
-                        }
-                        .print-table th {
-                            background-color: #f5f5f5 !important;
-                            font-weight: bold;
-                            text-align: center;
-                        }
-                        .text-center { text-align: center; }
-                        .font-mono { font-family: monospace; }
-                        .check-box { width: 100px; }
-                        .footer {
-                            margin-top: 30px;
-                            display: flex;
-                            justify-content: space-around;
-                        }
-                        .sig-box { text-align: center; }
-                        @media print {
-                            .header { -webkit-print-color-adjust: exact; }
-                            th { background-color: #f5f5f5 !important; -webkit-print-color-adjust: exact; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${html}
-                </body>
-                </html>
+                <html><head><title>พิมพ์ใบตรวจนับสต็อก</title><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+                <style>@page { size: A4; margin: 0.5cm; } body { font-family: 'Sarabun', sans-serif; margin: 0; padding: 0; color: #333; font-size: 12px; }
+                .print-container { padding: 10px; } .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 20px; } .header p { margin: 5px 0; font-size: 12px; color: #555; }
+                .print-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                .print-table th, .print-table td { border: 1px solid #000; padding: 6px 4px; }
+                .print-table th { background-color: #f5f5f5 !important; font-weight: bold; text-align: center; }
+                .text-center { text-align: center; } .font-mono { font-family: monospace; } .check-box { width: 100px; }
+                .footer { margin-top: 30px; display: flex; justify-content: space-around; } .sig-box { text-align: center; }
+                @media print { .header { -webkit-print-color-adjust: exact; } th { background-color: #f5f5f5 !important; -webkit-print-color-adjust: exact; } }
+                </style></head><body>${html}</body></html>
             `);
             printWindow.document.close();
-            
-            printWindow.onload = function() {
-                setTimeout(() => {
-                    printWindow.print();
-                    printWindow.close();
-                }, 500);
-            };
+            printWindow.onload = () => { setTimeout(() => { printWindow.print(); printWindow.close(); }, 500); };
         };
 
         window.getConversionFactor = (from, to) => {
@@ -533,7 +520,16 @@
         function refreshView() { if(window.appState.currentUser) renderView(window.appState.currentView); }
         initApp();
 
-        window.createItem = async (d) => { try { await addDoc(collection(db, `artifacts/${appId}/public/data/items`), { code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); alertSuccess('สำเร็จ'); renderView('item-master'); } catch(e){alertError(e.message)} };
+        // ACTIONS
+        window.createItem = async (d, silent=false) => { 
+            try { 
+                await addDoc(collection(db, `artifacts/${appId}/public/data/items`), { 
+                    code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 
+                }); 
+                if(!silent) alertSuccess('สำเร็จ'); 
+                if(!silent) renderView('item-master'); 
+            } catch(e){ if(!silent) alertError(e.message); } 
+        };
         window.deleteItem = async (id) => { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e){alertError(e.message)} };
         window.saveEditItem = async () => { const id=document.getElementById('edit-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) }); closeModal('edit-item-modal'); alertSuccess('แก้ไขแล้ว'); } catch(e){alertError(e.message)} };
         window.saveMinStockModal = async () => { const id=document.getElementById('modal-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: parseInt(document.getElementById('modal-min-stock-input').value) }); closeModal('min-stock-modal'); } catch(e){alertError(e.message)} };
@@ -725,13 +721,31 @@
                 </div>`;
         }
 
-        window.setInventoryFilter = (f) => { window.appState.inventoryFilter = f; renderView('inventory-status'); };
-        window.toggleLowStockFilter = () => { window.appState.inventoryLowStockOnly = !window.appState.inventoryLowStockOnly; renderView('inventory-status'); };
-        window.filterInventoryTable = () => { const f=document.getElementById('inventory-search').value.toLowerCase(); document.querySelectorAll('.item-row').forEach(r => r.style.display = r.getAttribute('data-search').includes(f)?"":"none"); };
-
         function renderItemMaster() {
-            const can = checkPerm('manage_item'), form = can ? `<div class="bg-white rounded-2xl shadow-sm border p-6 sticky top-24"><h3 class="font-bold mb-4 text-slate-800"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้า</h3><form onsubmit="handleCreateItem(event)" class="space-y-4"><div><label class="text-xs font-bold text-slate-500">รหัส</label><input name="code" class="w-full border p-2 rounded-lg" required></div><div><label class="text-xs font-bold text-slate-500">ชื่อ</label><input name="name" class="w-full border p-2 rounded-lg" required></div><div class="grid grid-cols-2 gap-2"><div><label class="text-xs font-bold text-slate-500">ประเภท</label><select name="type" class="w-full border p-2 rounded-lg bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div><div><label class="text-xs font-bold text-slate-500">หน่วย</label><select name="unit" class="w-full border p-2 rounded-lg bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div></div><div><label class="text-xs font-bold text-slate-500">Min Stock</label><input type="number" name="minStock" class="w-full border p-2 rounded-lg" value="0"></div><button class="w-full bg-primary text-white py-2 rounded-lg font-bold">บันทึก</button></form></div>` : ``;
-            const list = window.localData.items.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors"><td class="py-3 px-4 font-bold text-primary text-center">${i.code}</td><td class="text-center font-medium">${i.name}</td><td class="text-center text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded font-bold">${i.type}</span></td><td class="text-center text-slate-500 uppercase text-center">${i.unit}</td><td class="text-center">${can?`<button onclick="openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 mr-2 transition-colors"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-trash-alt"></i></button>`:'-'}</td></tr>`).join('');
+            const can = checkPerm('manage_item');
+            const form = can ? `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-24">
+                    <h3 class="font-bold mb-4 text-slate-800 flex items-center"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้า</h3>
+                    <form onsubmit="handleCreateItem(event)" class="space-y-4">
+                        <div><label class="text-xs font-bold text-slate-500">รหัส</label><input name="code" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
+                        <div><label class="text-xs font-bold text-slate-500">ชื่อ</label><input name="name" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-xs font-bold text-slate-500">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
+                            <div><label class="text-xs font-bold text-slate-500">หน่วย</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-500">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" value="0"></div>
+                        <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">บันทึกสินค้า</button>
+                    </form>
+                    <div class="mt-8 pt-6 border-t border-slate-100">
+                        <label class="text-xs font-bold text-slate-400 block mb-3 uppercase">นำเข้าข้อมูลจำนวนมาก</label>
+                        <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
+                        <button onclick="document.getElementById('excel-file-input').click()" class="w-full bg-white text-emerald-600 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all">
+                            <i class="fas fa-file-excel text-lg"></i> นำเข้าจาก Excel
+                        </button>
+                        <p class="text-[10px] text-slate-400 mt-2 text-center">* หัวคอลัมน์: รหัส, ชื่อ, ประเภท, หน่วย, Min Stock</p>
+                    </div>
+                </div>` : ``;
+            const list = window.localData.items.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors"><td class="py-3 px-4 font-bold text-primary text-center font-mono">${i.code}</td><td class="text-center font-medium">${i.name}</td><td class="text-center text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded font-bold">${i.type}</span></td><td class="text-center text-slate-500 uppercase text-center">${i.unit}</td><td class="text-center">${can?`<button onclick="openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 mr-2 transition-colors"><i class="fas fa-edit"></i></button><button onclick="deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-trash-alt"></i></button>`:'-'}</td></tr>`).join('');
             return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div>${form}</div><div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b"><tr><th class="py-4 px-6 text-center font-bold text-slate-500 uppercase text-[11px]">รหัส</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ชื่อสินค้า</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">ประเภท</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">หน่วย</th><th class="text-center font-bold text-slate-500 uppercase text-[11px]">จัดการ</th></tr></thead><tbody>${list}</tbody></table></div></div>`;
         }
 
