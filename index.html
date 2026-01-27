@@ -252,7 +252,8 @@
             issueRefDoc: '', 
             issueDate: '',
             inventoryFilter: 'ALL', 
-            inventoryLowStockOnly: false
+            inventoryLowStockOnly: false,
+            receiveHistoryFilterDate: '' 
         };
 
         // --- CORE UI HELPERS ---
@@ -372,6 +373,9 @@
             });
             e.target.reset();
             window.clearSelection('receive-item');
+            setTimeout(() => {
+                if(window.appState.currentView === 'receive') window.renderView('receive');
+            }, 1000);
         };
 
         window.handleAddIssueItem = () => {
@@ -452,6 +456,7 @@
                     
                     alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ${errorCount > 0 ? ` (ข้าม ${errorCount} รายการเนื่องจากไม่พบรหัสสินค้า)` : ''}`);
                     event.target.value = ''; 
+                    window.renderView('receive');
                 } catch (err) { alertError("Error: " + err.message); }
             };
             reader.readAsArrayBuffer(file);
@@ -614,6 +619,11 @@
             };
             reader.readAsArrayBuffer(file);
         };
+
+        window.updateReceiveHistoryFilter = (date) => {
+            window.appState.receiveHistoryFilterDate = date;
+            window.renderView('receive');
+        };
     </script>
 
     <!-- SCRIPT 2: FIREBASE MODULE -->
@@ -691,16 +701,16 @@
             const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; 
             try { 
                 const stockRef = await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
-                await logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
-                // Return success for bulk import if needed, but the original UI alerts per item in manual mode
+                await logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
                 return true;
             } catch(e){ throw e; } 
         };
 
-        async function logTrans(type, itemId, lotNo, qty, note, cDate, stockId) { 
+        async function logTrans(type, itemId, lotNo, qty, unit, note, cDate, stockId) { 
             const i = window.localData.items.find(x=>String(x.id) === String(itemId)); 
             await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), { 
                 type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
+                unit: unit || (i ? i.unit : '-'), // Store the unit
                 actionBy: window.appState.currentUser.name, note: note||'-', 
                 date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), 
                 timestamp: Date.now(), 
@@ -715,7 +725,7 @@
             let st=act==='PASS'?'AVAILABLE':(act==='HOLD'?'HOLD':'REJECT'); 
             try { 
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); 
-                await logTrans('QC_'+act, s.itemId, s.lotNo, 0, `${s.status}->${st} (${rem})`, null, id); 
+                await logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, `${s.status}->${st} (${rem})`, null, id); 
                 alertSuccess('บันทึก QC'); 
             } catch(e){alertError(e.message)} 
         };
@@ -738,7 +748,7 @@
                         if(rem<=0) break; 
                         let deduct = Math.min(l.qty, rem); 
                         await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); 
-                        await logTrans('ISSUE', c.itemId, l.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
+                        await logTrans('ISSUE', c.itemId, l.lotNo, -deduct, l.unit, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
                         rem -= deduct; 
                     } 
                 } 
@@ -856,10 +866,10 @@
                             <h3 class="font-bold text-slate-800 text-center flex-1 ml-10 text-lg">ความเคลื่อนไหวล่าสุด (Recent Activities)</h3>
                             <button onclick="window.renderView('history')" class="text-xs font-bold text-primary hover:underline">ดูทั้งหมด</button>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6 border-b">เวลา</th><th class="py-3 px-6 border-b">ประเภท</th><th class="py-3 px-6 text-left border-b">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b">ชื่อสินค้า</th><th class="py-3 px-6 border-b">จำนวน</th><th class="py-3 px-6 border-b">โดย</th></tr></thead><tbody>
+                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6 border-b">เวลา</th><th class="py-3 px-6 border-b">ประเภท</th><th class="py-3 px-6 text-left border-b">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b">ชื่อสินค้า</th><th class="py-3 px-6 border-b">จำนวน</th><th class="py-3 px-6 border-b">หน่วย</th><th class="py-3 px-6 border-b">โดย</th></tr></thead><tbody>
                         ${recentTrans.map(t => { const itemSplit = t.item.split(' - '), code = itemSplit[0] || '-', name = itemSplit[1] || '-', displayType = typeMap[t.type] || t.type;
-                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${t.date.split(' ')[1]}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy}</td></tr>` }).join('')}
-                        ${recentTrans.length === 0 ? '<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400 italic font-medium">ยังไม่มีข้อมูลรายการเคลื่อนไหว</td></tr>' : ''}
+                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${t.date.split(' ')[1]}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-slate-900 font-bold uppercase text-center">${t.unit || '-'}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy}</td></tr>` }).join('')}
+                        ${recentTrans.length === 0 ? '<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 italic font-medium">ยังไม่มีข้อมูลรายการเคลื่อนไหว</td></tr>' : ''}
                         </tbody></table></div>
                     </div>
                 </div>`;
@@ -995,36 +1005,79 @@
         }
 
         function renderReceiveForm() { 
-            return `<div class="max-w-3xl mx-auto space-y-6 text-center">
-                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                    <div class="flex justify-between items-center mb-6 border-b pb-4">
-                        <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
-                        <div>
-                            <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
-                            <button onclick="document.getElementById('receive-excel-input').click()" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
-                                <i class="fas fa-file-excel"></i> นำเข้าสต็อกเก่า (Excel)
-                            </button>
+            const filterDate = window.appState.receiveHistoryFilterDate || '';
+            const allReceiveTrans = window.localData.transactions.filter(t => t.type === 'RECEIVE' && t.status !== 'VOIDED');
+            
+            const filteredTrans = filterDate 
+                ? allReceiveTrans.filter(t => t.date.includes(new Date(filterDate).toLocaleDateString('th-TH').split(' ')[0]))
+                : allReceiveTrans.slice(0, 10); 
+
+            const historyHTML = filteredTrans.map(t => {
+                const parts = t.item.split(' - ');
+                const code = parts[0] || '?';
+                const name = parts[1] || '?';
+                return `
+                    <div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                        <div class="flex justify-between items-start gap-2 mb-1">
+                            <span class="text-[10px] font-bold text-primary font-mono">${code}</span>
+                            <span class="text-[9px] text-slate-400 font-mono">${t.date.split(' ')[1]}</span>
+                        </div>
+                        <div class="text-[11px] font-bold text-slate-700 truncate mb-1" title="${name}">${name}</div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-mono">Lot: ${t.lot}</span>
+                            <span class="font-bold text-emerald-600">+${t.qty.toLocaleString()} ${t.unit || ''}</span>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            return `
+            <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-6 border-b pb-4">
+                            <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
+                            <div>
+                                <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
+                                <button onclick="document.getElementById('receive-excel-input').click()" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
+                                    <i class="fas fa-file-excel"></i> นำเข้าสต็อกเก่า (Excel)
+                                </button>
+                            </div>
+                        </div>
+                        <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
+                            <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-xs font-bold text-slate-500">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
+                                <div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-xs font-bold text-slate-500">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div>
+                                <div><label class="text-xs font-bold text-slate-500">Location</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
+                            </div>
+                            <button class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+                        <div class="p-5 border-b border-slate-100 bg-slate-50/50">
+                            <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center"><i class="fas fa-clock-rotate-left text-primary mr-2"></i> ประวัติรับเข้าล่าสุด</h3>
+                            <div class="relative">
+                                <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="date" class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs outline-none focus:border-primary transition-all" 
+                                       value="${filterDate}" onchange="window.updateReceiveHistoryFilter(this.value)">
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-y-auto custom-scrollbar max-h-[500px]">
+                            ${historyHTML || `<div class="p-10 text-center text-slate-300 italic text-xs">ไม่พบข้อมูลประวัติ</div>`}
+                        </div>
+                        <div class="p-3 bg-slate-50 border-t border-slate-100 text-center">
+                            <button onclick="window.renderView('history')" class="text-[10px] font-bold text-primary hover:underline">ดูประวัติทั้งหมด <i class="fas fa-arrow-right ml-1"></i></button>
                         </div>
                     </div>
-                    <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
-                        <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-xs font-bold text-slate-500">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
-                            <div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-xs font-bold text-slate-500">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div>
-                            <div><label class="text-xs font-bold text-slate-500">Location</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
-                        </div>
-                        <button class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button>
-                    </form>
-                </div>
-                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-left">
-                    <p class="text-xs font-bold text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i> คำแนะนำสำหรับการนำเข้า Excel:</p>
-                    <p class="text-[10px] text-indigo-500 leading-relaxed">คอลัมน์ที่ต้องมี: <b>รหัสสินค้า, Lot No, จำนวน, หน่วย, วันหมดอายุ, Location</b><br>ระบบจะตรวจสอบรหัสสินค้ากับฐานข้อมูล หากไม่พบข้อมูลรายการนั้นจะถูกข้าม</p>
                 </div>
             </div>`; 
         }
@@ -1046,7 +1099,7 @@
         
         function renderHistory() { 
             const isAdmin = window.appState.currentUser.role === 'ADMIN', typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; 
-            return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-center"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-4 border-b">เวลา</th><th class="border-b">ประเภท</th><th class="text-left border-b">สินค้า</th><th class="border-b">Lot</th><th class="border-b">จำนวน</th><th class="border-b">โดย</th><th class="border-b">Note</th><th class="border-b">Action</th></tr></thead><tbody>${window.localData.transactions.map(t => {
+            return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-center"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-4 border-b">เวลา</th><th class="border-b">ประเภท</th><th class="text-left border-b">สินค้า</th><th class="border-b">Lot</th><th class="border-b">จำนวน</th><th class="border-b">หน่วย</th><th class="border-b">โดย</th><th class="border-b">Note</th><th class="border-b">Action</th></tr></thead><tbody>${window.localData.transactions.map(t => {
                 const isVoided = t.status === 'VOIDED';
                 return `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-xs font-medium ${isVoided ? 'voided-row bg-slate-50' : ''}">
                     <td class="p-3 text-[10px] text-slate-400 font-mono">${t.date}</td>
@@ -1058,6 +1111,8 @@
                     <td class="p-3 text-left font-medium text-slate-700">${t.item || 'Unknown'}</td>
                     <td class="p-3 font-mono text-[10px] text-center"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td>
                     <td class="p-3 text-center font-bold text-xs ${isVoided ? 'text-slate-300' : (t.qty<0?'text-red-500':'text-emerald-500')}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td>
+                    <!-- ADDED UNIT COLUMN IN HISTORY: COLOR TO BLACK (SLATE-900) AND BOLD -->
+                    <td class="p-3 text-center text-slate-900 font-bold uppercase text-[10px]">${t.unit || '-'}</td>
                     <td class="p-3 text-[10px] text-slate-500 text-center">${t.actionBy}</td>
                     <td class="p-3 text-[10px] text-slate-400 text-center">${isVoided ? `โดย ${t.voidBy} (${t.voidAt})` : t.note}</td>
                     <td class="p-3 text-center">
