@@ -385,7 +385,6 @@
             const item = window.localData.items.find(x => String(x.id) === String(itemId));
             if(!item) return;
 
-            // --- VALIDATION: CHECK AVAILABLE STOCK BEFORE ADDING TO CART ---
             const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.status === 'AVAILABLE' && s.qty > 0);
             const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
             
@@ -408,6 +407,54 @@
         window.removeFromIssueCart = (idx) => {
             window.appState.issueCart.splice(idx, 1);
             window.renderView('issue');
+        };
+
+        // --- EXCEL IMPORT FOR RECEIVE (GR) ---
+        window.handleReceiveExcelImport = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
+                    
+                    let successCount = 0;
+                    let errorCount = 0;
+                    
+                    for (const row of jsonData) {
+                        const code = (row["รหัสสินค้า"] || row["Code"] || "").toString().trim().toUpperCase();
+                        const lotNo = (row["Lot No"] || row["Lot"] || "OLD-DATA").toString().trim();
+                        const qty = parseFloat(row["จำนวน"] || row["Qty"] || 0);
+                        const unit = (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase();
+                        const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
+                        const location = (row["Location"] || row["Loc"] || "MAIN").toString().trim();
+
+                        const item = window.localData.items.find(i => i.code === code);
+                        
+                        if (item && qty > 0) {
+                            await window.receiveItem({
+                                itemId: item.id,
+                                lotNo: lotNo,
+                                qty: qty,
+                                unit: unit,
+                                expDate: expDate,
+                                location: location
+                            });
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    }
+                    
+                    alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ${errorCount > 0 ? ` (ข้าม ${errorCount} รายการเนื่องจากไม่พบรหัสสินค้า)` : ''}`);
+                    event.target.value = ''; 
+                } catch (err) { alertError("Error: " + err.message); }
+            };
+            reader.readAsArrayBuffer(file);
         };
 
         // --- AUTH & SESSION ---
@@ -645,9 +692,9 @@
             try { 
                 const stockRef = await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
                 await logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
-                alertSuccess(`รับเข้าสำเร็จ (${convertedQty} ${item.unit})`); 
-                window.renderView('dashboard'); 
-            } catch(e){alertError(e.message)} 
+                // Return success for bulk import if needed, but the original UI alerts per item in manual mode
+                return true;
+            } catch(e){ throw e; } 
         };
 
         async function logTrans(type, itemId, lotNo, qty, note, cDate, stockId) { 
@@ -676,7 +723,6 @@
         window.processIssueBatch = async () => { 
             if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return alertError('ข้อมูลไม่ครบ'); 
             try { 
-                // --- PRE-CHECK BATCH AVAILABILITY BEFORE UPDATING ---
                 for(let c of window.appState.issueCart) {
                     const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.status === 'AVAILABLE' && s.qty > 0);
                     const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
@@ -709,7 +755,6 @@
             if (!confirm(`ต้องการยกเลิกรายการนี้? ระบบจะทำการคืนสต็อกจำนวน ${Math.abs(trans.qty)} หน่วย เข้าสู่ Lot ${trans.lot}`)) return;
 
             try {
-                // 1. Revert Stock Logic
                 let stockDoc = window.localData.stock.find(s => s.id === trans.stockId);
                 if (!stockDoc) {
                     stockDoc = window.localData.stock.find(s => String(s.itemId) === String(trans.itemId) && s.lotNo === trans.lot);
@@ -728,7 +773,6 @@
                     }
                 }
 
-                // 2. Mark Transaction as VOIDED
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id), { 
                     status: 'VOIDED',
                     voidBy: window.appState.currentUser.name,
@@ -838,7 +882,6 @@
                 const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
                 if (isLowStockOnly && !isLow) return null;
 
-                // --- ADJUSTED AGING COLUMN LOGIC: SUPPORT MULTIPLE LOTS ---
                 const active = s.filter(x => x.qty > 0); 
                 let ag = '<span class="text-slate-300">-</span>';
                 if (active.length) {
@@ -862,7 +905,6 @@
                     <td class="py-3 px-6 text-center text-slate-400">${i.minStock||0}</td>
                     <td class="py-3 px-4 text-center min-w-[120px] max-w-[200px] whitespace-normal leading-tight">${ag}</td>
                     <td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <!-- UPDATED UNIT COLUMN: COLOR TO BLACK (SLATE-900) FOR BETTER VISIBILITY -->
                     <td class="py-3 px-6 text-center text-[10px] text-slate-900 font-bold uppercase text-center">${i.unit}</td>
                     <td class="py-3 px-6 text-center font-bold text-emerald-600 text-center">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="py-3 px-6 text-center font-bold text-amber-500 text-center">${qc>0?qc.toLocaleString():'-'}</td>
@@ -952,7 +994,41 @@
             return `<div class="max-w-7xl mx-auto text-center"><div class="grid grid-cols-1 lg:grid-cols-4 gap-8"><div class="lg:col-span-1">${form}</div><div class="lg:col-span-3">${stats}<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] flex flex-col"><div class="px-6 py-4 border-b border-slate-50 bg-slate-50/30 text-center font-bold text-slate-800 uppercase text-lg">รายการสินค้าทั้งหมดในระบบ</div><div class="flex-1 overflow-auto custom-scrollbar"><table class="w-full text-sm text-left border-collapse"><thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold"><tr><th class="py-4 px-6 text-left border-b">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr></thead><tbody>${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ยังไม่มีข้อมูลสินค้าในระบบ</td></tr>'}</tbody></table></div></div></div></div></div>`;
         }
 
-        function renderReceiveForm() { return `<div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center"><h3 class="text-xl font-bold mb-6 text-center border-b pb-4 text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3><form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left"><div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div><div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div><div><label class="text-xs font-bold text-slate-500">Location</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div></div><button class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button></form></div>`; }
+        function renderReceiveForm() { 
+            return `<div class="max-w-3xl mx-auto space-y-6 text-center">
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-6 border-b pb-4">
+                        <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
+                        <div>
+                            <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
+                            <button onclick="document.getElementById('receive-excel-input').click()" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
+                                <i class="fas fa-file-excel"></i> นำเข้าสต็อกเก่า (Excel)
+                            </button>
+                        </div>
+                    </div>
+                    <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
+                        <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-slate-500">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
+                            <div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-slate-500">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div>
+                            <div><label class="text-xs font-bold text-slate-500">Location</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
+                        </div>
+                        <button class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button>
+                    </form>
+                </div>
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-left">
+                    <p class="text-xs font-bold text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i> คำแนะนำสำหรับการนำเข้า Excel:</p>
+                    <p class="text-[10px] text-indigo-500 leading-relaxed">คอลัมน์ที่ต้องมี: <b>รหัสสินค้า, Lot No, จำนวน, หน่วย, วันหมดอายุ, Location</b><br>ระบบจะตรวจสอบรหัสสินค้ากับฐานข้อมูล หากไม่พบข้อมูลรายการนั้นจะถูกข้าม</p>
+                </div>
+            </div>`; 
+        }
+
         function renderQCTask() { 
             const t=window.localData.stock.filter(s=>s.status==='WAIT_QC'&&s.qty>0); 
             if(!t.length)return `<div class="text-center py-20 flex flex-col items-center gap-4 text-slate-400 italic font-medium">ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ</div>`; 
