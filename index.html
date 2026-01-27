@@ -320,6 +320,84 @@
             document.getElementById('clear-btn-' + cid).classList.add('hidden'); 
         };
 
+        // --- NEW HELPER FUNCTIONS FOR MISSING HANDLERS ---
+        window.openMinStockModal = (id) => {
+            const item = window.localData.items.find(x => String(x.id) === String(id));
+            if(!item) return;
+            document.getElementById('modal-item-id').value = id;
+            document.getElementById('modal-item-name').innerText = `${item.code} : ${item.name}`;
+            document.getElementById('modal-min-stock-input').value = item.minStock || 0;
+            document.getElementById('min-stock-modal').classList.remove('hidden');
+        };
+
+        window.openEditItemModal = (id) => {
+            const item = window.localData.items.find(x => String(x.id) === String(id));
+            if(!item) return;
+            document.getElementById('edit-item-id').value = id;
+            document.getElementById('edit-item-code').value = item.code;
+            document.getElementById('edit-item-name').value = item.name;
+            document.getElementById('edit-item-type').value = item.type;
+            document.getElementById('edit-item-unit').value = item.unit;
+            document.getElementById('edit-item-min').value = item.minStock || 0;
+            document.getElementById('edit-item-modal').classList.remove('hidden');
+        };
+
+        window.handleCreateItem = (e) => {
+            e.preventDefault();
+            const d = new FormData(e.target);
+            window.createItem({
+                code: d.get('code'),
+                name: d.get('name'),
+                type: d.get('type'),
+                unit: d.get('unit'),
+                minStock: d.get('minStock')
+            });
+            e.target.reset();
+        };
+
+        window.handleReceiveSubmit = (e) => {
+            e.preventDefault();
+            const d = new FormData(e.target);
+            const itemId = d.get('itemId');
+            if(!itemId) return window.alertError("กรุณาเลือกสินค้า");
+            window.receiveItem({
+                itemId: itemId,
+                lotNo: d.get('lotNo'),
+                qty: d.get('qty'),
+                expDate: d.get('expDate'),
+                location: d.get('location'),
+                unit: d.get('unit')
+            });
+            e.target.reset();
+            window.clearSelection('receive-item');
+        };
+
+        window.handleAddIssueItem = () => {
+            const itemId = document.getElementById('hidden-item-id-issue-item').value;
+            const qty = parseFloat(document.getElementById('input-qty').value);
+            const unit = document.getElementById('input-unit').value;
+            if(!itemId || !qty || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน");
+
+            const item = window.localData.items.find(x => String(x.id) === String(itemId));
+            if(!item) return;
+
+            const baseFactor = window.getConversionFactor(unit, item.unit);
+            const baseQty = qty * baseFactor;
+
+            window.appState.issueCart.push({
+                itemId, item, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit
+            });
+
+            document.getElementById('input-qty').value = '';
+            window.clearSelection('issue-item');
+            window.renderView('issue');
+        };
+
+        window.removeFromIssueCart = (idx) => {
+            window.appState.issueCart.splice(idx, 1);
+            window.renderView('issue');
+        };
+
         // --- AUTH & SESSION ---
         window.handleLogin = async function(e) {
             e.preventDefault();
@@ -358,7 +436,6 @@
                 setTimeout(() => {
                     document.getElementById('app-layout').classList.add('hidden');
                     document.getElementById('login-view').classList.remove('hidden');
-                    document.querySelector('#login-view form').reset();
                     document.getElementById('login-error').classList.add('hidden');
                 }, 300);
             }
