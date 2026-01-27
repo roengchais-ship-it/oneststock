@@ -862,7 +862,8 @@
                     <td class="py-3 px-6 text-center text-slate-400">${i.minStock||0}</td>
                     <td class="py-3 px-4 text-center min-w-[120px] max-w-[200px] whitespace-normal leading-tight">${ag}</td>
                     <td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="py-3 px-6 text-center text-[10px] text-slate-400 uppercase text-center">${i.unit}</td>
+                    <!-- UPDATED UNIT COLUMN: COLOR TO BLACK (SLATE-900) FOR BETTER VISIBILITY -->
+                    <td class="py-3 px-6 text-center text-[10px] text-slate-900 font-bold uppercase text-center">${i.unit}</td>
                     <td class="py-3 px-6 text-center font-bold text-emerald-600 text-center">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="py-3 px-6 text-center font-bold text-amber-500 text-center">${qc>0?qc.toLocaleString():'-'}</td>
                     <td class="py-3 px-6 text-center"><button onclick="window.openMinStockModal('${i.id}')" class="${cls}" ${!canManage?'disabled':''}><i class="fas fa-cog"></i></button></td>
