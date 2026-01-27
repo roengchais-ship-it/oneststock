@@ -413,7 +413,6 @@
             window.renderView('issue');
         };
 
-        // --- EXCEL IMPORT FOR RECEIVE (GR) ---
         window.handleReceiveExcelImport = function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -462,7 +461,6 @@
             reader.readAsArrayBuffer(file);
         };
 
-        // --- AUTH & SESSION ---
         window.handleLogin = async function(e) {
             e.preventDefault();
             const d = new FormData(e.target);
@@ -595,13 +593,13 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.SheetNames[0]);
                     if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
                     let successCount = 0;
                     for (const row of jsonData) {
                         const item = {
-                            code: (row["รหัส"] || row["Code"] || "").toString().trim(),
-                            name: (row["ชื่อ"] || row["Name"] || "").toString().trim(),
+                            code: (row["รหัสสินค้า"] || row["รหัส"] || row["Code"] || "").toString().trim(),
+                            name: (row["ชื่อสินค้า"] || row["ชื่อ"] || row["Name"] || "").toString().trim(),
                             type: (row["ประเภท"] || row["Type"] || "RM").toString().trim().toUpperCase(),
                             unit: (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase(),
                             minStock: parseInt(row["Min Stock"] || row["Min"] || 0)
@@ -615,6 +613,7 @@
                     }
                     alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ`);
                     event.target.value = ''; 
+                    window.renderView('item-master');
                 } catch (err) { alertError("Error: " + err.message); }
             };
             reader.readAsArrayBuffer(file);
@@ -710,7 +709,7 @@
             const i = window.localData.items.find(x=>String(x.id) === String(itemId)); 
             await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), { 
                 type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
-                unit: unit || (i ? i.unit : '-'), // Store the unit
+                unit: unit || (i ? i.unit : '-'), 
                 actionBy: window.appState.currentUser.name, note: note||'-', 
                 date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), 
                 timestamp: Date.now(), 
@@ -868,7 +867,7 @@
                         </div>
                         <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6 border-b">เวลา</th><th class="py-3 px-6 border-b">ประเภท</th><th class="py-3 px-6 text-left border-b">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b">ชื่อสินค้า</th><th class="py-3 px-6 border-b">จำนวน</th><th class="py-3 px-6 border-b">หน่วย</th><th class="py-3 px-6 border-b">โดย</th></tr></thead><tbody>
                         ${recentTrans.map(t => { const itemSplit = t.item.split(' - '), code = itemSplit[0] || '-', name = itemSplit[1] || '-', displayType = typeMap[t.type] || t.type;
-                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${t.date.split(' ')[1]}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-slate-900 font-bold uppercase text-center">${t.unit || '-'}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy}</td></tr>` }).join('')}
+                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${t.date.split(' ')[1]}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="px-6 py-4 text-slate-900 font-bold uppercase text-[10px]">${t.unit || '-'}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy}</td></tr>` }).join('')}
                         ${recentTrans.length === 0 ? '<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 italic font-medium">ยังไม่มีข้อมูลรายการเคลื่อนไหว</td></tr>' : ''}
                         </tbody></table></div>
                     </div>
@@ -986,7 +985,17 @@
                         </form>
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูล</h3>
+                        <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูลสินค้า</h3>
+                        <div class="mb-4 bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
+                            <p class="text-[11px] font-bold text-blue-600 mb-1 leading-tight"><i class="fas fa-info-circle mr-1"></i> รูปแบบคอลัมน์ใน Excel:</p>
+                            <ul class="text-[10px] text-blue-500 list-disc list-inside space-y-0.5">
+                                <li><b>รหัสสินค้า</b> (Code) - จำเป็น</li>
+                                <li><b>ชื่อสินค้า</b> (Name) - จำเป็น</li>
+                                <li><b>ประเภท</b> (Type) - RM, FG, PKG</li>
+                                <li><b>หน่วย</b> (Unit) - kg, pcs, set, g, ml</li>
+                                <li><b>Min Stock</b> - ตัวเลขจุดสั่งซื้อ</li>
+                            </ul>
+                        </div>
                         <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
                         <button onclick="document.getElementById('excel-file-input').click()" class="w-full bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-sm">
                             <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
@@ -1036,13 +1045,28 @@
                     <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
                         <div class="flex justify-between items-center mb-6 border-b pb-4">
                             <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
-                            <div>
+                            <div class="flex gap-2">
                                 <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
                                 <button onclick="document.getElementById('receive-excel-input').click()" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
                                     <i class="fas fa-file-excel"></i> นำเข้าสต็อกเก่า (Excel)
                                 </button>
                             </div>
                         </div>
+
+                        <!-- NEW: Info Box for GR Excel Import -->
+                        <div class="mb-6 bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-left">
+                            <p class="text-xs font-bold text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i> รายละเอียดคอลัมน์ Excel สำหรับนำเข้าสต็อก:</p>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-4">
+                                <div class="text-[10px] text-slate-600"><b>รหัสสินค้า</b> (Code): รหัสที่ตรงกับฐานข้อมูล</div>
+                                <div class="text-[10px] text-slate-600"><b>Lot No</b>: เลขล็อตสินค้า</div>
+                                <div class="text-[10px] text-slate-600"><b>จำนวน</b> (Qty): ตัวเลขจำนวนที่รับเข้า</div>
+                                <div class="text-[10px] text-slate-600"><b>หน่วย</b> (Unit): kg, pcs, set, g, ml</div>
+                                <div class="text-[10px] text-slate-600"><b>วันหมดอายุ</b> (Exp): YYYY-MM-DD</div>
+                                <div class="text-[10px] text-slate-600"><b>Location</b>: ตำแหน่งจัดเก็บ</div>
+                            </div>
+                            <p class="text-[9px] text-indigo-400 mt-2 italic font-medium">* ข้อมูลจะถูกบันทึกด้วยสถานะ "รอตรวจ QC" (WAIT_QC) โดยอัตโนมัติ</p>
+                        </div>
+
                         <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
                             <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
                             <div class="grid grid-cols-2 gap-4">
@@ -1061,7 +1085,7 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-1 space-y-6">
+                <div class="lg:col-span-1 space-y-6 text-left">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
                         <div class="p-5 border-b border-slate-100 bg-slate-50/50">
                             <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center"><i class="fas fa-clock-rotate-left text-primary mr-2"></i> ประวัติรับเข้าล่าสุด</h3>
@@ -1111,7 +1135,6 @@
                     <td class="p-3 text-left font-medium text-slate-700">${t.item || 'Unknown'}</td>
                     <td class="p-3 font-mono text-[10px] text-center"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td>
                     <td class="p-3 text-center font-bold text-xs ${isVoided ? 'text-slate-300' : (t.qty<0?'text-red-500':'text-emerald-500')}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td>
-                    <!-- ADDED UNIT COLUMN IN HISTORY: COLOR TO BLACK (SLATE-900) AND BOLD -->
                     <td class="p-3 text-center text-slate-900 font-bold uppercase text-[10px]">${t.unit || '-'}</td>
                     <td class="p-3 text-[10px] text-slate-500 text-center">${t.actionBy}</td>
                     <td class="p-3 text-[10px] text-slate-400 text-center">${isVoided ? `โดย ${t.voidBy} (${t.voidAt})` : t.note}</td>
