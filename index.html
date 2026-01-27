@@ -828,20 +828,39 @@
             let filteredItems = window.localData.items;
             if (currentFilter !== 'ALL') filteredItems = filteredItems.filter(i => i.type === currentFilter);
             const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+            
             const rows = filteredItems.map(i => {
-                const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), tot=s.reduce((a,b)=>a+b.qty,0), av=s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0), qc=s.filter(x=>x.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
+                const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), 
+                      tot=s.reduce((a,b)=>a+b.qty,0), 
+                      av=s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty,0), 
+                      qc=s.filter(x=>x.status==='WAIT_QC').reduce((a,b)=>a+b.qty,0);
+                
                 const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
                 if (isLowStockOnly && !isLow) return null;
-                const active = s.filter(x=>x.qty>0); let ag = '<span class="text-slate-300">-</span>';
-                if(active.length){ const old=active.sort((a,b)=>new Date(a.receivedDate)-new Date(b.receivedDate))[0]; if(old&&old.receivedDate){ const d=Math.floor((new Date()-new Date(old.receivedDate))/86400000); ag=`<span class="px-2 py-0.5 rounded text-[10px] border ${d<=30?'bg-emerald-50 text-emerald-700 border-emerald-100':'bg-red-50 text-red-700 border-red-100'}">${d} วัน</span>`; } }
+
+                // --- ADJUSTED AGING COLUMN LOGIC: SUPPORT MULTIPLE LOTS ---
+                const active = s.filter(x => x.qty > 0); 
+                let ag = '<span class="text-slate-300">-</span>';
+                if (active.length) {
+                    ag = active.sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate))
+                        .map(lot => {
+                            const d = Math.floor((new Date() - new Date(lot.receivedDate)) / 86400000);
+                            return `<div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border mb-1 mr-1 ${d <= 30 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}" title="Lot: ${lot.lotNo} | Qty: ${lot.qty}">
+                                <span class="font-bold">${d}</span>
+                                <span class="opacity-70 text-[8px]">ว.</span>
+                            </div>`;
+                        }).join('');
+                }
+
                 const canManage = window.checkPerm('manage_item');
                 const cls = canManage ? 'text-slate-400 hover:text-primary' : 'text-slate-200 cursor-not-allowed';
+                
                 return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row" data-search="${i.code.toLowerCase()} ${i.name.toLowerCase()}">
                     <td class="py-3 px-6 text-left font-bold text-indigo-600 font-mono">${i.code}</td>
                     <td class="py-3 px-6 text-left text-slate-700 font-medium">${i.name}</td>
                     <td class="py-3 px-6 text-center text-[10px]"><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded font-bold">${i.type}</span></td>
                     <td class="py-3 px-6 text-center text-slate-400">${i.minStock||0}</td>
-                    <td class="py-3 px-6 text-center">${ag}</td>
+                    <td class="py-3 px-4 text-center min-w-[120px] max-w-[200px] whitespace-normal leading-tight">${ag}</td>
                     <td class="py-3 px-6 text-center font-bold ${isLow?'text-red-600':'text-slate-800'}">${tot.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="py-3 px-6 text-center text-[10px] text-slate-400 uppercase text-center">${i.unit}</td>
                     <td class="py-3 px-6 text-center font-bold text-emerald-600 text-center">${av.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
@@ -849,8 +868,10 @@
                     <td class="py-3 px-6 text-center"><button onclick="window.openMinStockModal('${i.id}')" class="${cls}" ${!canManage?'disabled':''}><i class="fas fa-cog"></i></button></td>
                 </tr>`;
             }).filter(row => row !== null).join('');
+
             const getCount = (type) => window.localData.items.filter(i => type === 'ALL' || i.type === type).length;
             const lowStockCount = window.localData.items.filter(i => { const tot = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)).reduce((a,b)=>a+b.qty,0); return tot <= (i.minStock || 0) && (i.minStock || 0) > 0; }).length;
+            
             return `
                 <div class="space-y-6 max-w-7xl mx-auto text-center">
                     <div class="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-6">
@@ -883,7 +904,7 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[500px] flex flex-col">
                         <div class="flex-1 overflow-auto custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse" id="inventory-table">
-                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">Min</th><th class="border-b">Aging</th><th class="border-b">คงเหลือ</th><th class="border-b">หน่วย</th><th class="border-b">พร้อมใช้</th><th class="border-b">รอ QC</th><th class="border-b">ตั้งค่า</th></tr></thead>
+                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">Min</th><th class="border-b">Aging (ว.)</th><th class="border-b">คงเหลือ</th><th class="border-b">หน่วย</th><th class="border-b">พร้อมใช้</th><th class="border-b">รอ QC</th><th class="border-b">ตั้งค่า</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                             ${rows === '' ? '<div class="p-20 text-center flex flex-col items-center gap-3"><i class="fas fa-magnifying-glass text-4xl text-slate-200"></i><p class="text-slate-400 italic">ไม่พบข้อมูลสินค้าที่คุณกำลังค้นหา</p></div>' : ''}
