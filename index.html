@@ -322,7 +322,7 @@
             document.getElementById('clear-btn-' + cid).classList.add('hidden'); 
         };
 
-        // --- NEW HELPER FUNCTIONS FOR MISSING HANDLERS ---
+        // --- HELPER FUNCTIONS FOR UI HANDLERS ---
         window.openMinStockModal = (id) => {
             const item = window.localData.items.find(x => String(x.id) === String(id));
             if(!item) return;
@@ -376,15 +376,25 @@
 
         window.handleAddIssueItem = () => {
             const itemId = document.getElementById('hidden-item-id-issue-item').value;
-            const qty = parseFloat(document.getElementById('input-qty').value);
+            const qtyInput = document.getElementById('input-qty').value;
+            const qty = parseFloat(qtyInput);
             const unit = document.getElementById('input-unit').value;
-            if(!itemId || !qty || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน");
+            
+            if(!itemId || isNaN(qty) || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน");
 
             const item = window.localData.items.find(x => String(x.id) === String(itemId));
             if(!item) return;
 
-            const baseFactor = window.getConversionFactor(unit, item.unit);
-            const baseQty = qty * baseFactor;
+            // --- VALIDATION: CHECK AVAILABLE STOCK BEFORE ADDING TO CART ---
+            const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.status === 'AVAILABLE' && s.qty > 0);
+            const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
+            
+            const factor = window.getConversionFactor(unit, item.unit);
+            const baseQty = qty * factor;
+
+            if (baseQty > totalAvailable) {
+                return window.alertError(`สินค้าไม่เพียงพอเบิก!\nมีพร้อมใช้ทั้งหมด: ${totalAvailable.toFixed(2)} ${item.unit}\nที่คุณต้องการ: ${baseQty.toFixed(2)} ${item.unit}`);
+            }
 
             window.appState.issueCart.push({
                 itemId, item, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit
@@ -666,6 +676,15 @@
         window.processIssueBatch = async () => { 
             if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return alertError('ข้อมูลไม่ครบ'); 
             try { 
+                // --- PRE-CHECK BATCH AVAILABILITY BEFORE UPDATING ---
+                for(let c of window.appState.issueCart) {
+                    const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.status === 'AVAILABLE' && s.qty > 0);
+                    const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
+                    if (c.baseQty > totalAvailable) {
+                        return window.alertError(`สินค้า "${c.item.name}" มีไม่เพียงพอในคลังแล้วในขณะนี้ (พร้อมใช้: ${totalAvailable.toFixed(2)})`);
+                    }
+                }
+
                 for(let c of window.appState.issueCart) { 
                     const lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate)); 
                     let rem = c.baseQty; 
@@ -691,25 +710,20 @@
 
             try {
                 // 1. Revert Stock Logic
-                // Find target stock doc using stockId or (itemId + lotNo)
                 let stockDoc = window.localData.stock.find(s => s.id === trans.stockId);
                 if (!stockDoc) {
-                    // Fallback to searching by item/lot if ID not matched
                     stockDoc = window.localData.stock.find(s => String(s.itemId) === String(trans.itemId) && s.lotNo === trans.lot);
                 }
 
                 if (trans.type === 'RECEIVE') {
-                    // Void Receiving: Subtract stock
                     if (stockDoc) {
                         const newQty = Math.max(0, stockDoc.qty - trans.qty);
                         await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: newQty });
                     }
                 } else if (trans.type === 'ISSUE') {
-                    // Void Issuing: Add stock back
                     if (stockDoc) {
                         await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: stockDoc.qty + Math.abs(trans.qty) });
                     } else {
-                        // Lot might have been deleted? Re-create if necessary or alert
                         return alertError("ไม่พบข้อมูล Lot เดิมในระบบ ไม่สามารถคืนค่าสต็อกได้");
                     }
                 }
@@ -771,7 +785,6 @@
             });
             window.localData.stock.forEach(s=>{ if(s.qty>0){ const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(it){ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; } } });
             
-            // Only show active transactions on dashboard
             const activeTrans = window.localData.transactions.filter(t => t.status !== 'VOIDED');
             const recentTrans = activeTrans.slice(0, 5);
             const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
@@ -922,7 +935,7 @@
             const t=window.localData.stock.filter(s=>s.status==='WAIT_QC'&&s.qty>0); 
             if(!t.length)return `<div class="text-center py-20 flex flex-col items-center gap-4 text-slate-400 italic font-medium">ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ</div>`; 
             return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${t.map(s=>{ const i=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(!i)return ''; 
-                return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center"><div class="mb-4"><div class="flex justify-between items-start gap-2"><h4 class="font-bold text-indigo-600 font-mono text-left">${i.code}</h4><span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100 text-center">Exp: ${s.expDate}</span></div><div class="text-sm font-bold text-slate-700 mt-2 text-left">${i.name}</div><div class="mt-3 grid grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">จำนวน</span><span class="font-bold text-slate-600">${s.qty.toLocaleString()} ${i.unit}</span></div></div></div><div class="flex gap-2 pt-2"><button onclick="window.qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors">Pass</button><button onclick="window.qcAction('${s.id}','HOLD','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition-colors">Hold</button><button onclick="window.qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-600 py-2.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors">Reject</button></div></div>`}).join('')}</div>`; 
+                return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center"><div class="mb-4"><div class="flex justify-between items-start mb-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">WAIT QC</span><span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100 text-center">Exp: ${s.expDate}</span></div><h4 class="font-bold text-indigo-600 font-mono text-left">${i.code}</h4><div class="text-sm font-bold text-slate-700 mt-2 text-left">${i.name}</div><div class="mt-3 grid grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">จำนวน</span><span class="font-bold text-slate-600">${s.qty.toLocaleString()} ${i.unit}</span></div></div></div><div class="flex gap-2 pt-2"><button onclick="window.qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors">Pass</button><button onclick="window.qcAction('${s.id}','HOLD','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition-colors">Hold</button><button onclick="window.qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-600 py-2.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors">Reject</button></div></div>`}).join('')}</div>`; 
         }
         
         function renderIssueForm() { 
