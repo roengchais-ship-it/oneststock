@@ -51,6 +51,8 @@
         .segmented-item.active { background: #fff; color: #4f46e5; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border-color: #e2e8f0; }
         .badge-count { background: #f1f5f9; color: #94a3b8; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
         .active .badge-count { background: #eef2ff; color: #4f46e5; }
+        
+        .voided-row { opacity: 0.6; filter: grayscale(0.5); text-decoration: line-through; }
     </style>
 </head>
 <body class="text-slate-800 antialiased overflow-hidden h-screen w-screen relative">
@@ -625,14 +627,110 @@
         window.deleteItem = async (id) => { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); alertSuccess('ลบแล้ว'); } catch(e){alertError(e.message)} };
         window.saveEditItem = async () => { const id=document.getElementById('edit-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) }); window.closeModal('edit-item-modal'); alertSuccess('แก้ไขแล้ว'); } catch(e){alertError(e.message)} };
         window.saveMinStockModal = async () => { const id=document.getElementById('modal-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: parseInt(document.getElementById('modal-min-stock-input').value) }); window.closeModal('min-stock-modal'); } catch(e){alertError(e.message)} };
-        window.receiveItem = async (d) => { const t=new Date().toISOString().split('T')[0], item = window.localData.items.find(x => String(x.id) === String(d.itemId)); if(!item) return alertError("ไม่พบข้อมูลสินค้า"); const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; try { await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); await logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`); alertSuccess(`รับเข้าสำเร็จ (${convertedQty} ${item.unit})`); window.renderView('dashboard'); } catch(e){alertError(e.message)} };
-        async function logTrans(type, itemId, lotNo, qty, note, cDate) { const i = window.localData.items.find(x=>String(x.id) === String(itemId)); await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), { type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, actionBy: window.appState.currentUser.name, note: note||'-', date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), timestamp: Date.now() }); }
-        window.qcAction = async (id, act, rem) => { const s=window.localData.stock.find(x=>x.id===id); if(!s)return; let st=act==='PASS'?'AVAILABLE':(act==='HOLD'?'HOLD':'REJECT'); try { await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); await logTrans('QC_'+act, s.itemId, s.lotNo, 0, `${s.status}->${st} (${rem})`); alertSuccess('บันทึก QC'); } catch(e){alertError(e.message)} };
-        window.processIssueBatch = async () => { if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return alertError('ข้อมูลไม่ครบ'); try { for(let c of window.appState.issueCart) { const lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate)); let rem = c.baseQty; for(let l of lots) { if(rem<=0) break; let deduct = Math.min(l.qty, rem); await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); await logTrans('ISSUE', c.itemId, l.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate); rem -= deduct; } } window.appState.issueCart=[]; window.appState.issueRefDoc=''; alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); } catch(e){alertError(e.message)} };
+        
+        window.receiveItem = async (d) => { 
+            const t=new Date().toISOString().split('T')[0], item = window.localData.items.find(x => String(x.id) === String(d.itemId)); 
+            if(!item) return alertError("ไม่พบข้อมูลสินค้า"); 
+            const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; 
+            try { 
+                const stockRef = await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
+                await logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
+                alertSuccess(`รับเข้าสำเร็จ (${convertedQty} ${item.unit})`); 
+                window.renderView('dashboard'); 
+            } catch(e){alertError(e.message)} 
+        };
+
+        async function logTrans(type, itemId, lotNo, qty, note, cDate, stockId) { 
+            const i = window.localData.items.find(x=>String(x.id) === String(itemId)); 
+            await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), { 
+                type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
+                actionBy: window.appState.currentUser.name, note: note||'-', 
+                date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), 
+                timestamp: Date.now(), 
+                status: 'ACTIVE',
+                stockId: stockId || null
+            }); 
+        }
+
+        window.qcAction = async (id, act, rem) => { 
+            const s=window.localData.stock.find(x=>x.id===id); 
+            if(!s)return; 
+            let st=act==='PASS'?'AVAILABLE':(act==='HOLD'?'HOLD':'REJECT'); 
+            try { 
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); 
+                await logTrans('QC_'+act, s.itemId, s.lotNo, 0, `${s.status}->${st} (${rem})`, null, id); 
+                alertSuccess('บันทึก QC'); 
+            } catch(e){alertError(e.message)} 
+        };
+
+        window.processIssueBatch = async () => { 
+            if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return alertError('ข้อมูลไม่ครบ'); 
+            try { 
+                for(let c of window.appState.issueCart) { 
+                    const lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate)); 
+                    let rem = c.baseQty; 
+                    for(let l of lots) { 
+                        if(rem<=0) break; 
+                        let deduct = Math.min(l.qty, rem); 
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); 
+                        await logTrans('ISSUE', c.itemId, l.lotNo, -deduct, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
+                        rem -= deduct; 
+                    } 
+                } 
+                window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
+                alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
+            } catch(e){alertError(e.message)} 
+        };
+
+        window.voidTransaction = async (id) => {
+            const trans = window.localData.transactions.find(t => t.id === id);
+            if (!trans || trans.status === 'VOIDED') return;
+            if (window.appState.currentUser.role !== 'ADMIN') return alertError('ไม่มีสิทธิ์ Void รายการ (Admin Only)');
+            
+            if (!confirm(`ต้องการยกเลิกรายการนี้? ระบบจะทำการคืนสต็อกจำนวน ${Math.abs(trans.qty)} หน่วย เข้าสู่ Lot ${trans.lot}`)) return;
+
+            try {
+                // 1. Revert Stock Logic
+                // Find target stock doc using stockId or (itemId + lotNo)
+                let stockDoc = window.localData.stock.find(s => s.id === trans.stockId);
+                if (!stockDoc) {
+                    // Fallback to searching by item/lot if ID not matched
+                    stockDoc = window.localData.stock.find(s => String(s.itemId) === String(trans.itemId) && s.lotNo === trans.lot);
+                }
+
+                if (trans.type === 'RECEIVE') {
+                    // Void Receiving: Subtract stock
+                    if (stockDoc) {
+                        const newQty = Math.max(0, stockDoc.qty - trans.qty);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: newQty });
+                    }
+                } else if (trans.type === 'ISSUE') {
+                    // Void Issuing: Add stock back
+                    if (stockDoc) {
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: stockDoc.qty + Math.abs(trans.qty) });
+                    } else {
+                        // Lot might have been deleted? Re-create if necessary or alert
+                        return alertError("ไม่พบข้อมูล Lot เดิมในระบบ ไม่สามารถคืนค่าสต็อกได้");
+                    }
+                }
+
+                // 2. Mark Transaction as VOIDED
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id), { 
+                    status: 'VOIDED',
+                    voidBy: window.appState.currentUser.name,
+                    voidAt: new Date().toLocaleString('th-TH')
+                });
+
+                alertSuccess('ยกเลิกรายการและคืนสต็อกสำเร็จ');
+            } catch (e) {
+                alertError("Void Error: " + e.message);
+            }
+        };
+
         window.saveProfile = async () => { const id=document.getElementById('profile-id').value, name=document.getElementById('profile-name').value, pass=document.getElementById('profile-password').value, dObj={name}; if(pass)dObj.password=pass; try { await updateDoc(doc(db,`artifacts/${appId}/public/data/users`,id),dObj); window.appState.currentUser.name=name; window.closeModal('profile-modal'); alertSuccess('บันทึกแล้ว'); }catch(e){alertError(e.message)} };
         window.handleCreateUser = async (e) => { e.preventDefault(); const d=new FormData(e.target); if(window.localData.users.find(u=>u.username===d.get('new_username')))return alertError('Username ซ้ำ'); try { await addDoc(collection(db,`artifacts/${appId}/public/data/users`),{username:d.get('new_username'),password:d.get('new_password'),name:d.get('new_name'),role:d.get('new_role')}); window.closeModal('user-manage-modal'); alertSuccess('สร้างแล้ว'); window.renderView('user-list'); }catch(e){alertError(e.message)} };
         window.deleteUser = async (id) => { if(confirm('ลบผู้ใช้งานนี้?')) { try { await deleteDoc(doc(db,`artifacts/${appId}/public/data/users`,id)); alertSuccess('ลบแล้ว'); window.renderView('user-list'); }catch(e){alertError(e.message)} } };
-        window.deleteTransaction = async (id) => { if (window.appState.currentUser.role !== 'ADMIN') return alertError('ไม่มีสิทธิ์'); if (confirm('ลบประวัติรายการนี้?')) { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id)); alertSuccess('ลบประวัติสำเร็จ'); window.renderView('history'); } catch (e) { alertError(e.message); } } };
+        window.deleteTransaction = async (id) => { if (window.appState.currentUser.role !== 'ADMIN') return alertError('ไม่มีสิทธิ์'); if (confirm('ลบประวัติรายการนี้ถาวร? (จะไม่มีการคืนสต็อก)')) { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id)); alertSuccess('ลบประวัติสำเร็จ'); window.renderView('history'); } catch (e) { alertError(e.message); } } };
     </script>
 
     <!-- SCRIPT 3: RENDERERS -->
@@ -672,8 +770,12 @@
                 if(sum<=(i.minStock||0)&&(i.minStock||0)>0) { low++; lowStockItems.push({ ...i, currentStock: sum }); }
             });
             window.localData.stock.forEach(s=>{ if(s.qty>0){ const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(it){ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; } } });
-            const recentTrans = window.localData.transactions.slice(0, 5);
+            
+            // Only show active transactions on dashboard
+            const activeTrans = window.localData.transactions.filter(t => t.status !== 'VOIDED');
+            const recentTrans = activeTrans.slice(0, 5);
             const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
+            
             return `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 text-center">
                     ${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}
@@ -830,7 +932,31 @@
         }
 
         function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm font-medium"><td class="p-4 text-left font-mono text-slate-600">${u.username}</td><td class="p-4 text-left font-bold text-slate-700">${u.name}</td><td class="p-4 text-center"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4 text-center"><button onclick="window.deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto text-center"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left border-b">Username</th><th class="p-4 text-left border-b">ชื่อพนักงาน</th><th class="border-b">ตำแหน่ง (Role)</th><th class="border-b">Action</th></tr></thead><tbody>${list}</tbody></table></div></div>`; }
-        function renderHistory() { const isAdmin = window.appState.currentUser.role === 'ADMIN', typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-center"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-4 border-b">เวลา</th><th class="border-b">ประเภท</th><th class="text-left border-b">สินค้า</th><th class="border-b">Lot</th><th class="border-b">จำนวน</th><th class="border-b">โดย</th><th class="border-b">Note</th>${isAdmin ? '<th class="border-b">ลบ</th>' : ''}</tr></thead><tbody>${window.localData.transactions.map(t => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-xs font-medium"><td class="p-3 text-[10px] text-slate-400 font-mono">${t.date}</td><td class="p-3 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${typeMap[t.type]||t.type}</span></td><td class="p-3 text-left font-medium text-slate-700">${t.item || 'Unknown'}</td><td class="p-3 font-mono text-[10px] text-center"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td><td class="p-3 text-center font-bold text-xs ${t.qty<0?'text-red-500':'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td><td class="p-3 text-[10px] text-slate-500 text-center">${t.actionBy}</td><td class="p-3 text-[10px] text-slate-400 text-center">${t.note}</td>${isAdmin ? `<td class="p-3 text-center"><button onclick="window.deleteTransaction('${t.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-2"><i class="fas fa-trash-can"></i></button></td>` : ''}</tr>`).join('')}</tbody></table></div>`; }
+        
+        function renderHistory() { 
+            const isAdmin = window.appState.currentUser.role === 'ADMIN', typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; 
+            return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-center"><table class="w-full text-sm text-left border-collapse"><thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-4 border-b">เวลา</th><th class="border-b">ประเภท</th><th class="text-left border-b">สินค้า</th><th class="border-b">Lot</th><th class="border-b">จำนวน</th><th class="border-b">โดย</th><th class="border-b">Note</th><th class="border-b">Action</th></tr></thead><tbody>${window.localData.transactions.map(t => {
+                const isVoided = t.status === 'VOIDED';
+                return `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-xs font-medium ${isVoided ? 'voided-row bg-slate-50' : ''}">
+                    <td class="p-3 text-[10px] text-slate-400 font-mono">${t.date}</td>
+                    <td class="p-3 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isVoided ? 'bg-slate-200 text-slate-400' : (t.type.includes('REC')?'bg-emerald-100 text-emerald-700':t.type.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700')}">
+                            ${isVoided ? 'ยกเลิกแล้ว' : (typeMap[t.type]||t.type)}
+                        </span>
+                    </td>
+                    <td class="p-3 text-left font-medium text-slate-700">${t.item || 'Unknown'}</td>
+                    <td class="p-3 font-mono text-[10px] text-center"><span class="bg-slate-100 rounded px-2 py-0.5 border border-slate-200">${t.lot}</span></td>
+                    <td class="p-3 text-center font-bold text-xs ${isVoided ? 'text-slate-300' : (t.qty<0?'text-red-500':'text-emerald-500')}">${t.qty > 0 ? '+' : ''}${t.qty.toFixed(2)}</td>
+                    <td class="p-3 text-[10px] text-slate-500 text-center">${t.actionBy}</td>
+                    <td class="p-3 text-[10px] text-slate-400 text-center">${isVoided ? `โดย ${t.voidBy} (${t.voidAt})` : t.note}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex justify-center gap-1">
+                            ${!isVoided ? `<button onclick="window.voidTransaction('${t.id}')" class="text-orange-400 hover:text-orange-600 p-2 transition-colors" title="Void"><i class="fas fa-undo"></i></button>` : ''}
+                            ${isAdmin ? `<button onclick="window.deleteTransaction('${t.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-2" title="ลบถาวร"><i class="fas fa-trash-can"></i></button>` : ''}
+                        </div>
+                    </td>
+                </tr>`}).join('')}</tbody></table></div>`; 
+        }
     </script>
 </body>
 </html>
