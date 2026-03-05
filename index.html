@@ -593,7 +593,8 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.SheetNames[0]);
+                    // แก้ไขตรงนี้: ดึงข้อมูลจาก Sheets[sheetName] ไม่ใช่ SheetNames[0] โดยตรง
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
                     if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
                     let successCount = 0;
                     for (const row of jsonData) {
