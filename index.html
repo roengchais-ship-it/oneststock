@@ -630,12 +630,46 @@
         window.handleItemMasterSearch = function(val) {
             window.appState.itemMasterSearch = val;
             window.appState.itemMasterPage = 1; // รีเซ็ตกลับไปหน้าแรกเมื่อค้นหา
-            window.renderView('item-master');
+            window.updateItemMasterTable(); // เรียกใช้อัปเดตเฉพาะตาราง แทนการรีโหลดทั้งหน้า
         };
 
         window.changeItemMasterPage = function(delta) {
             window.appState.itemMasterPage += delta;
-            window.renderView('item-master');
+            window.updateItemMasterTable(); // เรียกใช้อัปเดตเฉพาะตาราง แทนการรีโหลดทั้งหน้า
+        };
+
+        window.updateItemMasterTable = function() {
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
+            let filteredItems = window.localData.items;
+            if (searchTerm) {
+                filteredItems = filteredItems.filter(i => i.code.toLowerCase().includes(searchTerm) || i.name.toLowerCase().includes(searchTerm));
+            }
+            
+            const itemsPerPage = 50;
+            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
+            let currentPage = window.appState.itemMasterPage || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+            
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td class="py-3 px-4 font-bold text-primary text-left font-mono">${i.code}</td><td class="text-left font-medium text-slate-700">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            
+            const tbody = document.getElementById('item-master-tbody');
+            if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
+
+            const pagination = document.getElementById('item-master-pagination');
+            if (pagination) {
+                pagination.innerHTML = `
+                    <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+                        <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
+                        <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+                    </div>`;
+            }
         };
 
         // --- EXCEL TEMPLATE GENERATORS ---
@@ -1090,14 +1124,14 @@
                                             <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold">
                                                 <tr><th class="py-4 px-6 text-left border-b">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr>
                                             </thead>
-                                            <tbody>
+                                            <tbody id="item-master-tbody">
                                                 ${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>'}
                                             </tbody>
                                         </table>
                                     </div>
 
                                     <!-- Pagination Footer -->
-                                    <div class="px-6 py-3 border-t border-slate-100 bg-white flex justify-between items-center text-[12px]">
+                                    <div id="item-master-pagination" class="px-6 py-3 border-t border-slate-100 bg-white flex justify-between items-center text-[12px]">
                                         <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
                                         <div class="flex items-center gap-2">
                                             <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
