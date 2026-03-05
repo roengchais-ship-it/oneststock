@@ -655,7 +655,7 @@
             const startIndex = (currentPage - 1) * itemsPerPage;
             const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
 
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td class="py-3 px-4 font-bold text-primary text-left font-mono min-w-[200px] whitespace-nowrap">${i.code}</td><td class="text-left font-medium text-slate-700">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
             
             const tbody = document.getElementById('item-master-tbody');
             if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
@@ -979,8 +979,8 @@
                 const cls = canManage ? 'text-slate-400 hover:text-primary' : 'text-slate-200 cursor-not-allowed';
                 
                 return `<tr class="hover:bg-slate-50 border-b border-slate-100 item-row" data-search="${i.code.toLowerCase()} ${i.name.toLowerCase()}">
-                    <td class="py-3 px-6 text-left font-bold text-indigo-600 font-mono min-w-[180px] whitespace-nowrap">${i.code}</td>
-                    <td class="py-3 px-6 text-left text-slate-700 font-medium">${i.name}</td>
+                    <td style="width: 220px; min-width: 220px;" class="py-3 px-6 text-left font-bold text-indigo-600 font-mono break-all">${i.code}</td>
+                    <td class="py-3 px-6 text-left text-slate-700 font-medium break-words">${i.name}</td>
                     <td class="py-3 px-6 text-center text-[10px]"><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded font-bold">${i.type}</span></td>
                     <td class="py-3 px-6 text-center text-slate-400">${i.minStock||0}</td>
                     <td class="py-3 px-4 text-center min-w-[120px] max-w-[200px] whitespace-normal leading-tight">${ag}</td>
@@ -1027,7 +1027,7 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[500px] flex flex-col">
                         <div class="flex-1 overflow-auto custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse" id="inventory-table">
-                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="py-4 px-6 text-left border-b min-w-[180px] whitespace-nowrap">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">Min</th><th class="border-b">Aging (ว.)</th><th class="border-b">คงเหลือ</th><th class="border-b">หน่วย</th><th class="border-b">พร้อมใช้</th><th class="border-b">รอ QC</th><th class="border-b">ตั้งค่า</th></tr></thead>
+                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th style="width: 220px; min-width: 220px;" class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">Min</th><th class="border-b">Aging (ว.)</th><th class="border-b">คงเหลือ</th><th class="border-b">หน่วย</th><th class="border-b">พร้อมใช้</th><th class="border-b">รอ QC</th><th class="border-b">ตั้งค่า</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                             ${rows === '' ? '<div class="p-20 text-center flex flex-col items-center gap-3"><i class="fas fa-magnifying-glass text-4xl text-slate-200"></i><p class="text-slate-400 italic">ไม่พบข้อมูลสินค้าที่คุณกำลังค้นหา</p></div>' : ''}
@@ -1102,7 +1102,7 @@
             const startIndex = (currentPage - 1) * itemsPerPage;
             const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
 
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td class="py-3 px-4 font-bold text-primary text-left font-mono min-w-[200px] whitespace-nowrap">${i.code}</td><td class="text-left font-medium text-slate-700">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
             
             return `<div class="max-w-7xl mx-auto text-center">
                         <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -1122,7 +1122,7 @@
                                     <div class="flex-1 overflow-auto custom-scrollbar">
                                         <table class="w-full text-sm text-left border-collapse">
                                             <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold">
-                                                <tr><th class="py-4 px-6 text-left border-b min-w-[200px] whitespace-nowrap">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr>
+                                                <tr><th style="width: 250px; min-width: 250px;" class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr>
                                             </thead>
                                             <tbody id="item-master-tbody">
                                                 ${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>'}
