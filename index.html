@@ -624,6 +624,29 @@
             window.appState.receiveHistoryFilterDate = date;
             window.renderView('receive');
         };
+
+        // --- EXCEL TEMPLATE GENERATORS ---
+        window.downloadItemTemplate = function() {
+            const data = [
+                { "รหัสสินค้า": "ITM-001", "ชื่อสินค้า": "ตัวอย่างวัตถุดิบ 1", "ประเภท": "RM", "หน่วย": "kg", "Min Stock": 10 },
+                { "รหัสสินค้า": "ITM-002", "ชื่อสินค้า": "ตัวอย่างสินค้าสำเร็จรูป", "ประเภท": "FG", "หน่วย": "pcs", "Min Stock": 5 }
+            ];
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Items");
+            XLSX.writeFile(wb, "Item_Master_Template.xlsx");
+        };
+
+        window.downloadReceiveTemplate = function() {
+            const data = [
+                { "รหัสสินค้า": "ITM-001", "Lot No": "L-2401-01", "จำนวน": 100, "หน่วย": "kg", "วันหมดอายุ": "2025-12-31", "Location": "A-01" },
+                { "รหัสสินค้า": "ITM-002", "Lot No": "L-2401-02", "จำนวน": 50, "หน่วย": "pcs", "วันหมดอายุ": "-", "Location": "B-02" }
+            ];
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Receive");
+            XLSX.writeFile(wb, "Receive_Stock_Template.xlsx");
+        };
     </script>
 
     <!-- SCRIPT 2: FIREBASE MODULE -->
@@ -997,10 +1020,15 @@
                                 <li><b>Min Stock</b> - ตัวเลขจุดสั่งซื้อ</li>
                             </ul>
                         </div>
-                        <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
-                        <button onclick="document.getElementById('excel-file-input').click()" class="w-full bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-sm">
-                            <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="window.downloadItemTemplate()" type="button" class="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-sm">
+                                <i class="fas fa-download"></i> โหลดเทมเพลต
+                            </button>
+                            <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
+                            <button onclick="document.getElementById('excel-file-input').click()" type="button" class="flex-1 bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-sm">
+                                <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
+                            </button>
+                        </div>
                     </div>
                 </div>` : ``;
             const stats = `
@@ -1047,9 +1075,12 @@
                         <div class="flex justify-between items-center mb-6 border-b pb-4">
                             <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
                             <div class="flex gap-2">
+                                <button onclick="window.downloadReceiveTemplate()" type="button" class="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 transition-all text-sm" title="ดาวน์โหลดไฟล์ Excel แม่แบบ">
+                                    <i class="fas fa-download"></i> <span class="hidden sm:inline">เทมเพลต</span>
+                                </button>
                                 <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
-                                <button onclick="document.getElementById('receive-excel-input').click()" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
-                                    <i class="fas fa-file-excel"></i> นำเข้าสต็อกเก่า (Excel)
+                                <button onclick="document.getElementById('receive-excel-input').click()" type="button" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm" title="นำเข้าข้อมูลสต็อกจาก Excel">
+                                    <i class="fas fa-file-excel"></i> <span class="hidden sm:inline">นำเข้าสต็อก</span>
                                 </button>
                             </div>
                         </div>
