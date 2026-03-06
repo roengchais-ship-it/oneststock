@@ -308,7 +308,8 @@
             inventoryLowStockOnly: false,
             receiveHistoryFilterDate: '',
             itemMasterSearch: '',
-            itemMasterPage: 1
+            itemMasterPage: 1,
+            qcTab: 'PENDING'
         };
 
         // --- CORE UI HELPERS ---
@@ -910,15 +911,31 @@
             }); 
         }
 
-        window.qcAction = async (id, act, rem) => { 
-            const s=window.localData.stock.find(x=>x.id===id); 
-            if(!s)return; 
-            let st=act==='PASS'?'AVAILABLE':(act==='HOLD'?'HOLD':'REJECT'); 
+        window.executeQC = async (id, act) => { 
+            const s = window.localData.stock.find(x=>x.id===id); 
+            if(!s) return; 
+            
+            const sampleInput = document.getElementById('qc-sample-' + id);
+            const remarkInput = document.getElementById('qc-remark-' + id);
+            
+            const sampleQty = parseFloat(sampleInput.value) || 0;
+            const remarkText = remarkInput.value.trim() || '-';
+
+            if (sampleQty < 0 || sampleQty > s.qty) {
+                return alertError('จำนวนที่นำไปทดสอบไม่ถูกต้อง (ต้องไม่ติดลบและไม่เกินจำนวนรอตรวจ)');
+            }
+
+            let st = act === 'PASS' ? 'AVAILABLE' : (act === 'HOLD' ? 'HOLD' : 'REJECT'); 
+
             try { 
+                // เปลี่ยนแค่ Status ไม่ทำการหักลบ s.qty อีกต่อไป
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); 
-                await logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, `${s.status}->${st} (${rem})`, null, id); 
-                alertSuccess('บันทึก QC'); 
-            } catch(e){alertError(e.message)} 
+                // บันทึก Log แจ้งยอดที่หยิบไปตัวอย่าง (ให้ qty เป็น 0 ใน transaction เพื่อไม่ให้กระทบยอดรวม แต่ใส่ข้อมูลการหยิบใน Note)
+                const noteMsg = `สถานะ: ${st} | หยิบตัวอย่างทดสอบ: ${sampleQty} ${s.unit} | หมายเหตุ: ${remarkText}`;
+                await logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, noteMsg, null, id); 
+                
+                alertSuccess('บันทึกผล QC เรียบร้อย (จำนวนสินค้าในระบบยังคงเท่าเดิม)'); 
+            } catch(e){ alertError(e.message) } 
         };
 
         window.processIssueBatch = async () => { 
@@ -1364,11 +1381,115 @@
             </div>`; 
         }
 
+        window.switchQCTab = (tab) => {
+            window.appState.qcTab = tab;
+            window.renderView('qc-task');
+        };
+
         function renderQCTask() { 
-            const t=window.localData.stock.filter(s=>s.status==='WAIT_QC'&&s.qty>0); 
-            if(!t.length)return `<div class="text-center py-20 flex flex-col items-center gap-4 text-slate-400 italic font-medium">ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ</div>`; 
-            return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${t.map(s=>{ const i=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(!i)return ''; 
-                return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center"><div class="mb-4"><div class="flex justify-between items-start mb-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">WAIT QC</span><span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100 text-center">Exp: ${s.expDate}</span></div><h4 class="font-bold text-indigo-600 font-mono text-left">${i.code}</h4><div class="text-sm font-bold text-slate-700 mt-2 text-left">${i.name}</div><div class="mt-3 grid grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div><div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">จำนวน</span><span class="font-bold text-slate-600">${s.qty.toLocaleString()} ${i.unit}</span></div></div></div><div class="flex gap-2 pt-2"><button onclick="window.qcAction('${s.id}','PASS','OK')" class="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors">Pass</button><button onclick="window.qcAction('${s.id}','HOLD','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition-colors">Hold</button><button onclick="window.qcAction('${s.id}','FAIL','NG')" class="flex-1 bg-red-50 text-red-600 py-2.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors">Reject</button></div></div>`}).join('')}</div>`; 
+            const currentTab = window.appState.qcTab || 'PENDING';
+            const tabsHTML = `
+                <div class="flex justify-center mb-8">
+                    <div class="bg-slate-200 p-1.5 rounded-xl inline-flex shadow-inner">
+                        <button onclick="window.switchQCTab('PENDING')" class="px-8 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${currentTab==='PENDING' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <i class="fas fa-clipboard-list"></i> รายการรอตรวจ
+                        </button>
+                        <button onclick="window.switchQCTab('HISTORY')" class="px-8 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${currentTab==='HISTORY' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <i class="fas fa-clock-rotate-left"></i> ประวัติการตรวจ
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            if (currentTab === 'PENDING') {
+                const t = window.localData.stock.filter(s => s.status === 'WAIT_QC' && s.qty > 0); 
+                if (!t.length) return tabsHTML + `<div class="text-center py-20 flex flex-col items-center gap-4 text-slate-400 italic font-medium"><i class="fas fa-check-circle text-5xl text-emerald-200"></i> ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ</div>`; 
+                const cards = t.map(s => { 
+                    const i = window.localData.items.find(x => String(x.id) === String(s.itemId)); 
+                    if (!i) return ''; 
+                    return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center">
+                                <div class="mb-4">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">WAIT QC</span>
+                                        <span class="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold border border-red-100 text-center">Exp: ${s.expDate}</span>
+                                    </div>
+                                    <h4 class="font-bold text-indigo-600 font-mono text-left">${i.code}</h4>
+                                    <div class="text-sm font-bold text-slate-700 mt-2 text-left">${i.name}</div>
+                                    <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                                        <div class="bg-slate-50 p-2 rounded-lg text-center"><span class="text-slate-400 block mb-0.5">Lot No.</span><span class="font-mono font-bold text-slate-600">${s.lotNo}</span></div>
+                                        <div class="bg-amber-50 border border-amber-100 p-2 rounded-lg text-center"><span class="text-amber-500 block mb-0.5">รอตรวจ</span><span class="font-bold text-amber-700">${s.qty.toLocaleString()} ${i.unit}</span></div>
+                                    </div>
+                                    <div class="mt-4 text-left space-y-3">
+                                        <div>
+                                            <label class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">จำนวนที่หยิบใช้เพื่อทดสอบ (ไม่หักสต็อก)</label>
+                                            <div class="flex items-center gap-2">
+                                                <div class="relative w-full">
+                                                    <i class="fas fa-vial absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                                                    <input type="number" id="qc-sample-${s.id}" class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none transition-all font-bold text-slate-700" placeholder="0" min="0" max="${s.qty}" step="0.01">
+                                                </div>
+                                                <span class="text-xs text-slate-500 font-bold uppercase w-8 text-center">${i.unit}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">หมายเหตุ</label>
+                                            <input type="text" id="qc-remark-${s.id}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary outline-none transition-all placeholder-slate-300" placeholder="เช่น สภาพกล่อง, สี, กลิ่น...">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 pt-3 border-t border-slate-100 mt-2">
+                                    <button onclick="window.executeQC('${s.id}','PASS')" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition-transform transform active:scale-95"><i class="fas fa-check-circle mr-1"></i> Pass</button>
+                                    <button onclick="window.executeQC('${s.id}','HOLD')" class="flex-1 bg-amber-100 text-amber-700 py-3 rounded-xl text-sm font-bold hover:bg-amber-200 transition-transform transform active:scale-95"><i class="fas fa-pause-circle mr-1"></i> Hold</button>
+                                    <button onclick="window.executeQC('${s.id}','FAIL')" class="flex-1 bg-red-50 text-red-600 py-3 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-100 transition-transform transform active:scale-95"><i class="fas fa-times-circle mr-1"></i> Reject</button>
+                                </div>
+                            </div>`
+                }).join(''); 
+                return tabsHTML + `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">${cards}</div>`; 
+            } else {
+                const qcTrans = window.localData.transactions.filter(t => t.type.startsWith('QC_') && t.status !== 'VOIDED');
+                const rows = qcTrans.map(t => {
+                    const badge = t.type === 'QC_PASS' ? '<span class="text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full text-[10px] font-bold"><i class="fas fa-check mr-1"></i> PASS</span>' :
+                                  t.type === 'QC_HOLD' ? '<span class="text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full text-[10px] font-bold"><i class="fas fa-pause mr-1"></i> HOLD</span>' :
+                                  '<span class="text-red-600 bg-red-50 border border-red-200 px-3 py-1 rounded-full text-[10px] font-bold"><i class="fas fa-times mr-1"></i> REJECT</span>';
+                    
+                    // เนื่องจากเราไม่ได้เก็บ Qty ติดลบแล้ว ข้อมูลจำนวนที่ตัดมาทดสอบ จะถูกฝังอยู่ใน Note แทน 
+                    // ดังนั้นคอลัมน์ "ตัดตรวจ" ในหน้าประวัติ จะไม่แสดงตัวเลขติดลบอีก
+                    return `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors text-sm">
+                            <td class="py-3 px-4 text-xs text-slate-500 font-mono">${t.date}</td>
+                            <td class="py-3 px-4 font-bold text-slate-700 text-left">${t.item}</td>
+                            <td class="py-3 px-4 font-mono text-indigo-600 text-center">${t.lot}</td>
+                            <td class="py-3 px-4 text-center">${badge}</td>
+                            <td class="py-3 px-4 text-left text-xs text-slate-500">${t.note}</td>
+                            <td class="py-3 px-4 text-center text-xs font-bold text-slate-600">${t.actionBy}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return tabsHTML + `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden max-w-7xl mx-auto">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-lg">ประวัติการตรวจสอบคุณภาพ (QC)</h3>
+                        </div>
+                        <div class="overflow-x-auto max-h-[600px] custom-scrollbar">
+                            <table class="w-full text-sm text-left border-collapse">
+                                <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]">
+                                    <tr>
+                                        <th class="py-4 px-4 border-b">เวลาที่บันทึก</th>
+                                        <th class="py-4 px-4 text-left border-b">ข้อมูลสินค้า</th>
+                                        <th class="py-4 px-4 border-b">Lot No.</th>
+                                        <th class="py-4 px-4 border-b">ผลการประเมิน</th>
+                                        <th class="py-4 px-4 text-left border-b">รายละเอียดและหมายเหตุ</th>
+                                        <th class="py-4 px-4 border-b">ผู้ตรวจ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rows.length ? rows : '<tr><td colspan="6" class="text-center py-16 text-slate-400 italic">ยังไม่มีประวัติการบันทึกตรวจ QC</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
         }
         
         function renderIssueForm() { 
