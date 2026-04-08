@@ -350,6 +350,7 @@
             issueDate: '',
             inventoryFilter: 'ALL', 
             inventoryLowStockOnly: false,
+            inventoryExpiringSoonOnly: false, // ADDED: State for 6 months expiration filter
             receiveHistoryFilterDate: '',
             itemMasterSearch: '',
             itemMasterPage: 1,
@@ -805,6 +806,12 @@
             if(window.appState.currentView === 'inventory-status') window.renderView('inventory-status'); 
         };
 
+        // ADDED: Toggle function for Expiring Soon filter
+        window.toggleExpiringSoonFilter = () => {
+            window.appState.inventoryExpiringSoonOnly = !window.appState.inventoryExpiringSoonOnly;
+            if(window.appState.currentView === 'inventory-status') window.renderView('inventory-status');
+        };
+
         window.filterInventoryTable = () => { 
             const f = document.getElementById('inventory-search').value.toLowerCase(); 
             document.querySelectorAll('.item-row').forEach(r => {
@@ -1241,11 +1248,19 @@
         function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex flex-col items-center"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2 text-center w-full">${t}</p><h3 class="text-3xl font-bold ${tc} text-center">${v.toLocaleString()}</h3></div><div class="mt-3 p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
 
         function renderInventoryStatus() {
-            const currentFilter = window.appState.inventoryFilter, isLowStockOnly = window.appState.inventoryLowStockOnly;
+            const currentFilter = window.appState.inventoryFilter, 
+                  isLowStockOnly = window.appState.inventoryLowStockOnly,
+                  isExpiringSoonOnly = window.appState.inventoryExpiringSoonOnly; // ADDED
+                  
             let filteredItems = window.localData.items;
             if (currentFilter !== 'ALL') filteredItems = filteredItems.filter(i => i.type === currentFilter);
             const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
             
+            // Time reference for 6 months limit
+            const now = new Date();
+            const sixMonthsLimit = new Date();
+            sixMonthsLimit.setMonth(now.getMonth() + 6);
+
             const rows = filteredItems.map(i => {
                 const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), 
                       tot=s.reduce((a,b)=>a+b.qty,0), 
@@ -1256,6 +1271,22 @@
                 if (isLowStockOnly && !isLow) return null;
 
                 const active = s.filter(x => x.qty > 0); 
+                
+                // ADDED: Logic to check if any active lot is expiring within 6 months
+                let hasExpiringLot = false;
+                for(let lot of active) {
+                    if (lot.expDate && lot.expDate !== '-') {
+                        const expD = new Date(lot.expDate);
+                        if (expD <= sixMonthsLimit) {
+                            hasExpiringLot = true;
+                            break;
+                        }
+                    }
+                }
+
+                // ADDED: Apply the "Expiring Soon" filter condition
+                if (isExpiringSoonOnly && !hasExpiringLot) return null;
+
                 let ag = '<span class="text-slate-300">-</span>';
                 if (active.length) {
                     ag = active.sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate))
@@ -1289,6 +1320,15 @@
             const getCount = (type) => window.localData.items.filter(i => type === 'ALL' || i.type === type).length;
             const lowStockCount = window.localData.items.filter(i => { const tot = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)).reduce((a,b)=>a+b.qty,0); return tot <= (i.minStock || 0) && (i.minStock || 0) > 0; }).length;
             
+            // ADDED: Calculate how many items have lots expiring in < 6 months
+            const expiringCount = window.localData.items.filter(i => {
+                const activeStock = window.localData.stock.filter(x => String(x.itemId) === String(i.id) && x.qty > 0);
+                return activeStock.some(lot => {
+                    if (!lot.expDate || lot.expDate === '-') return false;
+                    return new Date(lot.expDate) <= sixMonthsLimit;
+                });
+            }).length;
+            
             return `
                 <div class="space-y-6 max-w-7xl mx-auto text-center">
                     <div class="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-6">
@@ -1308,9 +1348,16 @@
                                     <i class="fas fa-check-double"></i> FG <span class="badge-count">${getCount('FG')}</span>
                                 </div>
                             </div>
+                            
                             <button onclick="window.toggleLowStockFilter()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all ${isLowStockOnly?'bg-red-500 text-white border-red-500 shadow-lg shadow-red-200':'bg-white text-red-600 border-red-100 hover:border-red-200 hover:bg-red-50'}">
                                 <i class="fas fa-triangle-exclamation"></i> สินค้าใกล้หมด <span class="${isLowStockOnly?'bg-white/20 text-white':'bg-red-100 text-red-600'} px-2 py-0.5 rounded-md text-[10px]">${lowStockCount}</span>
                             </button>
+                            
+                            <!-- ADDED: 6 Months Expiration Filter Button -->
+                            <button onclick="window.toggleExpiringSoonFilter()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all ${isExpiringSoonOnly?'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-200':'bg-white text-orange-600 border-orange-100 hover:border-orange-200 hover:bg-orange-50'}">
+                                <i class="fas fa-hourglass-half"></i> ใกล้หมดอายุ (6ด.) <span class="${isExpiringSoonOnly?'bg-white/20 text-white':'bg-orange-100 text-orange-600'} px-2 py-0.5 rounded-md text-[10px]">${expiringCount}</span>
+                            </button>
+                            
                             <div class="h-8 w-px bg-slate-200 mx-1"></div>
                             <button onclick="window.printStockCheckSheet()" class="flex items-center gap-2 bg-white hover:bg-red-50 text-red-600 border border-red-200 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all transform active:scale-95">
                                 <i class="fas fa-file-pdf text-lg"></i> พิมพ์ใบตรวจนับ (PDF)
