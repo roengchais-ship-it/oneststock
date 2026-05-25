@@ -355,7 +355,8 @@
             itemMasterSearch: '',
             itemMasterPage: 1,
             qcTab: 'PENDING',
-            historyFilter: 'ALL' // ADDED: For History filtering
+            historyFilter: 'ALL',
+            historyFilterMonth: '' // ADDED: For History month filtering
         };
 
         // --- CORE UI HELPERS ---
@@ -815,6 +816,12 @@
         window.setHistoryFilter = (f) => { 
             window.appState.historyFilter = f; 
             if(window.appState.currentView === 'history') window.renderView('history'); 
+        };
+
+        // ฟังก์ชันใหม่สำหรับการกรองเดือน
+        window.setHistoryMonthFilter = (monthVal) => {
+            window.appState.historyFilterMonth = monthVal;
+            if(window.appState.currentView === 'history') window.renderView('history');
         };
 
         window.filterInventoryTable = () => { 
@@ -1758,20 +1765,40 @@
             const currentFilter = window.appState.historyFilter || 'ALL';
 
             let filteredTrans = window.localData.transactions;
+
+            // 1. กรองด้วยประเภทรายการ
             if (currentFilter === 'RECEIVE') filteredTrans = filteredTrans.filter(t => t.type === 'RECEIVE');
             else if (currentFilter === 'ISSUE') filteredTrans = filteredTrans.filter(t => t.type === 'ISSUE');
             else if (currentFilter === 'QC') filteredTrans = filteredTrans.filter(t => t.type.startsWith('QC_'));
             else if (currentFilter === 'VOIDED') filteredTrans = filteredTrans.filter(t => t.status === 'VOIDED');
 
+            // 2. กรองด้วยเดือน/ปี
+            if (window.appState.historyFilterMonth) {
+                const [year, month] = window.appState.historyFilterMonth.split('-');
+                filteredTrans = filteredTrans.filter(t => {
+                    if (!t.timestamp) return true; // ป้องกันข้อมูลเก่าไม่มี timestamp
+                    const d = new Date(t.timestamp);
+                    return d.getFullYear() === parseInt(year) && (d.getMonth() + 1) === parseInt(month);
+                });
+            }
+
             const filterUI = `
-                <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 class="text-xl font-bold text-slate-800 text-left w-full sm:w-auto"><i class="fas fa-clock-rotate-left text-primary mr-2"></i> ประวัติรายการ</h3>
-                    <div class="segmented-control w-full sm:w-auto overflow-x-auto">
-                        <div onclick="window.setHistoryFilter('ALL')" class="segmented-item ${currentFilter==='ALL'?'active':''} whitespace-nowrap">ทั้งหมด</div>
-                        <div onclick="window.setHistoryFilter('RECEIVE')" class="segmented-item ${currentFilter==='RECEIVE'?'active':''} whitespace-nowrap">รับเข้า</div>
-                        <div onclick="window.setHistoryFilter('ISSUE')" class="segmented-item ${currentFilter==='ISSUE'?'active':''} whitespace-nowrap">เบิกจ่าย</div>
-                        <div onclick="window.setHistoryFilter('QC')" class="segmented-item ${currentFilter==='QC'?'active':''} whitespace-nowrap">QC</div>
-                        <div onclick="window.setHistoryFilter('VOIDED')" class="segmented-item ${currentFilter==='VOIDED'?'active':''} whitespace-nowrap text-red-500"><i class="fas fa-ban mr-1"></i> ยกเลิก (Void)</div>
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 class="text-xl font-bold text-slate-800 text-left w-full md:w-auto"><i class="fas fa-clock-rotate-left text-primary mr-2"></i> ประวัติรายการ</h3>
+                    
+                    <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-center">
+                        <div class="relative w-full sm:w-auto">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"><i class="fas fa-calendar-alt"></i></span>
+                            <input type="month" value="${window.appState.historyFilterMonth}" onchange="window.setHistoryMonthFilter(this.value)" class="w-full sm:w-auto border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:border-primary text-slate-600 bg-white transition-all shadow-sm">
+                        </div>
+                        
+                        <div class="segmented-control w-full sm:w-auto overflow-x-auto">
+                            <div onclick="window.setHistoryFilter('ALL')" class="segmented-item ${currentFilter==='ALL'?'active':''} whitespace-nowrap">ทั้งหมด</div>
+                            <div onclick="window.setHistoryFilter('RECEIVE')" class="segmented-item ${currentFilter==='RECEIVE'?'active':''} whitespace-nowrap">รับเข้า</div>
+                            <div onclick="window.setHistoryFilter('ISSUE')" class="segmented-item ${currentFilter==='ISSUE'?'active':''} whitespace-nowrap">เบิกจ่าย</div>
+                            <div onclick="window.setHistoryFilter('QC')" class="segmented-item ${currentFilter==='QC'?'active':''} whitespace-nowrap">QC</div>
+                            <div onclick="window.setHistoryFilter('VOIDED')" class="segmented-item ${currentFilter==='VOIDED'?'active':''} whitespace-nowrap text-red-500"><i class="fas fa-ban mr-1"></i> ยกเลิก (Void)</div>
+                        </div>
                     </div>
                 </div>
             `;
