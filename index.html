@@ -757,6 +757,9 @@
             document.getElementById('print-barcode-modal').classList.remove('hidden');
         };
 
+        // ===============================================
+        // --- PRINT BARCODE: ปรับความสูงเพื่อให้ได้ 3 ดวง ---
+        // ===============================================
         window.executePrintBarcode = function() {
             const id = document.getElementById('print-barcode-id').value;
             const qty = parseInt(document.getElementById('print-barcode-qty').value) || 1;
@@ -795,39 +798,40 @@
                     <title>Print Barcode - ${item.code}</title>
                     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
                     <style>
-                        /* ตั้งค่าหน้ากระดาษ ขนาด 100mm x 150mm */
-                        @page { size: 100mm 150mm; margin: 2mm; }
+                        /* ตั้งค่าหน้ากระดาษ ขนาด 100mm x 150mm margin 0 ป้องกันการปัดตกขอบ */
+                        @page { size: 100mm 150mm; margin: 0mm; }
                         body { 
                             font-family: 'Sarabun', sans-serif; 
                             margin: 0; 
-                            padding: 0; 
+                            padding: 2mm; /* ให้ระยะขอบของหน้าอยู่ที่ body แทน */
                             color: #000; 
+                            box-sizing: border-box;
                         }
                         .label {
                             width: 96mm; 
-                            height: 48mm; /* ปรับความสูงเล็กน้อยเพื่อให้มีพื้นที่เซ็นชื่อ (3 ดวงจะได้ 144mm) */
-                            border: 1px dashed #ccc; /* กรอบจางๆ เพื่อให้เห็นขอบเขตตอนเทส */
+                            height: 46mm; /* ลดความสูงลงจาก 48 เป็น 46 เพื่อให้ 3 ดวงรวมกันไม่เกิน 150mm */
+                            border: 1px dashed #eee; /* ให้สีจางลงกว่าเดิม จะได้ไม่กวนสายตาตอนปรินต์ */
                             box-sizing: border-box;
-                            padding: 3mm;
+                            padding: 2mm 3mm;
                             display: flex;
                             flex-direction: column;
                             align-items: center;
                             justify-content: space-between;
                             page-break-inside: avoid;
-                            margin: 0 auto 1.5mm auto; 
+                            margin: 0 auto 2mm auto; 
                         }
                         .sku { 
-                            font-size: 26px; 
+                            font-size: 22px; /* ลดฟอนต์ลงนิดนึงจะได้ไม่เบียด */
                             font-weight: 800;
                             line-height: 1;
                             margin-bottom: 2px;
                             text-align: center;
                         }
                         .name { 
-                            font-size: 13px; 
+                            font-size: 12px; 
                             font-weight: 700; 
                             text-align: center; 
-                            margin-bottom: 4px; 
+                            margin-bottom: 2px; 
                             overflow: hidden; 
                             text-overflow: ellipsis; 
                             white-space: nowrap; 
@@ -835,30 +839,30 @@
                         }
                         svg { 
                             max-width: 100%; 
-                            height: 17mm; 
+                            height: 14mm; /* ลดความสูงของบาร์โค้ดลงนิดนึง */
                             margin-bottom: auto; 
                         }
                         .qc-box { 
                             width: 100%; 
                             display: flex; 
                             justify-content: space-around; 
-                            font-size: 12px; 
+                            font-size: 11px; 
                             font-weight: 800; 
-                            border-top: 2px solid #000; 
+                            border-top: 1px solid #000; 
                             padding-top: 2px; 
                             margin-top: 2px; 
                         }
                         .qc-item { display: flex; align-items: center; gap: 4px; }
-                        .box { width: 14px; height: 14px; border: 2px solid #000; border-radius: 2px; }
+                        .box { width: 12px; height: 12px; border: 1px solid #000; border-radius: 2px; }
                         .qc-sign-area {
                             width: 100%;
                             display: flex;
                             justify-content: space-between;
-                            font-size: 11px;
+                            font-size: 10px;
                             font-weight: 600;
-                            margin-top: 4px;
+                            margin-top: 2px;
                             border-top: 1px dotted #ccc;
-                            padding-top: 4px;
+                            padding-top: 2px;
                         }
                     </style>
                     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
@@ -870,7 +874,7 @@
                             JsBarcode(el, el.getAttribute('data-code'), {
                                 format: "CODE128",
                                 width: 2,
-                                height: 50,
+                                height: 40, /* ลดความสูงของแท่งบาร์โค้ดลงจาก 50 เป็น 40 */
                                 displayValue: false,
                                 margin: 0
                             });
