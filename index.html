@@ -14,6 +14,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS for Excel Import -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- JsBarcode สำหรับสร้างบาร์โค้ด -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -61,7 +63,7 @@
     <div id="loading-screen" class="fixed inset-0 bg-slate-900 z-[60] flex flex-col items-center justify-center text-white transition-opacity duration-500">
         <i class="fas fa-circle-notch fa-spin text-5xl text-primary mb-4"></i>
         <h2 class="text-xl font-bold">กำลังเชื่อมต่อฐานข้อมูล Cloud...</h2>
-        <p class="text-slate-400 text-sm mt-2" id="loading-text">ตรวจสอบสิทธิ์การเข้าถึง</p>
+        <p class="text-slate-400 text-sm mt-2" id="loading-text">ตรวจสอบสิทธิ์การเข้าถึงและเตรียมข้อมูล</p>
     </div>
 
     <!-- 2. LOGIN SCREEN -->
@@ -368,35 +370,273 @@
         </div>
     </div>
 
-    <!-- SCRIPT 1: GLOBAL DATA, STATE & HANDLERS -->
+    <!-- SCRIPT 1: GLOBAL STATE, CORE LOGIC, AND RENDERERS -->
     <script>
-        // GLOBAL DATA & STATE
+        // ==========================================
+        // 1. TIMEOUT FALLBACK (ANTI-FREEZE)
+        // ==========================================
+        window.fallbackTimeout = setTimeout(() => {
+            const loader = document.getElementById('loading-screen');
+            if(loader && !loader.classList.contains('hidden')) {
+                loader.classList.add('hidden');
+                document.getElementById('login-view').classList.remove('hidden');
+                const err = document.getElementById('login-error');
+                if(err) {
+                    err.innerText = "กำลังใช้ฐานข้อมูลออฟไลน์ชั่วคราว / อินเทอร์เน็ตมีปัญหา";
+                    err.classList.remove('hidden');
+                }
+            }
+        }, 8000);
+
+        // ==========================================
+        // 2. GLOBAL DATA & STATE
+        // ==========================================
         window.localData = window.localData || { items: [], stock: [], transactions: [], users: [] };
         window.appState = window.appState || { 
-            currentUser: null, 
-            currentView: 'dashboard', 
-            issueCart: [], 
-            issueRefDoc: '', 
-            issueDate: '',
-            inventoryFilter: 'ALL', 
-            inventoryLowStockOnly: false,
-            inventoryExpiringSoonOnly: false,
-            receiveHistoryFilterDate: '',
-            itemMasterSearch: '',
-            itemMasterPage: 1,
-            qcTab: 'PENDING',
-            historyFilter: 'ALL',
-            historyFilterMonth: '',
-            historyFilterLot: ''
+            currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
+            inventoryFilter: 'ALL', inventoryLowStockOnly: false, inventoryExpiringSoonOnly: false,
+            receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
+            historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: ''
         };
 
-        // --- CORE UI HELPERS ---
+        const menuConfig = {
+            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
+            STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
+            QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'}]
+        };
+
         window.checkPerm = function(act) { 
             if (!window.appState.currentUser) return false;
             const r = window.appState.currentUser.role; 
             return act === 'manage_item' ? (r === 'ADMIN' || r === 'STOCK') : false; 
         };
 
+        window.alertSuccess = (m) => alert("✅ " + m); 
+        window.alertError = (m) => alert("❌ " + m);
+        window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
+
+        // ==========================================
+        // 3. DATABASE ACTION HANDLERS
+        // ==========================================
+        window.handleLogin = async function(e) {
+            e.preventDefault();
+            const d = new FormData(e.target);
+            const username = d.get('username');
+            const password = d.get('password');
+            if (window.localData.users.length === 0) {
+                window.localData.users.push({username:'admin',password:'1234',name:'System Admin',role:'ADMIN'});
+            }
+            const user = window.localData.users.find(u => u.username === username && u.password === password);
+            if (user) {
+                window.appState.currentUser = user;
+                if (window.auth && window.auth.currentUser && window.db_setDoc && window.db_doc && window.db) {
+                    try {
+                        const sessionPath = `artifacts/${window.appId}/users/${window.auth.currentUser.uid}/session`;
+                        await window.db_setDoc(window.db_doc(window.db, sessionPath, 'current'), { username: user.username, timestamp: Date.now() });
+                    } catch(err) { console.warn("Session error", err); }
+                }
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-layout').classList.remove('hidden');
+                setTimeout(()=>document.getElementById('app-layout').classList.remove('opacity-0'), 50);
+                if(typeof window.renderView === 'function') window.renderView('dashboard');
+            } else {
+                const err = document.getElementById('login-error');
+                err.innerText = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลอง admin / 1234)";
+                err.classList.remove('hidden');
+            }
+        };
+
+        window.logout = async function() {
+            if(confirm('ออกจากระบบ?')) {
+                if (window.auth && window.auth.currentUser && window.db_deleteDoc && window.db_doc && window.db) {
+                    try {
+                        const sessionPath = `artifacts/${window.appId}/users/${window.auth.currentUser.uid}/session`;
+                        await window.db_deleteDoc(window.db_doc(window.db, sessionPath, 'current'));
+                    } catch(err) {}
+                }
+                window.appState.currentUser = null;
+                document.getElementById('app-layout').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('app-layout').classList.add('hidden');
+                    document.getElementById('login-view').classList.remove('hidden');
+                    document.getElementById('login-error').classList.add('hidden');
+                }, 300);
+            }
+        };
+
+        window.createItem = async (d, silent=false) => { 
+            try { 
+                if (window.db_addDoc && window.db_collection && window.db && window.appId) {
+                    await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/items`), { code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); 
+                } else {
+                    window.localData.items.push({ id: Date.now().toString(), code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 });
+                }
+                if(!silent) { window.alertSuccess('สำเร็จ'); window.renderView('item-master'); }
+            } catch(e){ if(!silent) window.alertError(e.message); } 
+        };
+
+        window.deleteItem = async (id) => { 
+            try { 
+                if(window.db_deleteDoc && window.db_doc && window.db && window.appId) await window.db_deleteDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id)); 
+                else window.localData.items = window.localData.items.filter(x => x.id !== id);
+                window.alertSuccess('ลบแล้ว'); window.renderView('item-master');
+            } catch(e){window.alertError(e.message)} 
+        };
+
+        window.saveEditItem = async () => { 
+            const id=document.getElementById('edit-item-id').value; 
+            try { 
+                const newData = { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) };
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), newData); 
+                else { const item = window.localData.items.find(x => x.id === id); if (item) Object.assign(item, newData); }
+                window.closeModal('edit-item-modal'); window.alertSuccess('แก้ไขแล้ว'); window.renderView('item-master');
+            } catch(e){window.alertError(e.message)} 
+        };
+
+        window.saveMinStockModal = async () => { 
+            const id=document.getElementById('modal-item-id').value; 
+            try { 
+                const val = parseInt(document.getElementById('modal-min-stock-input').value);
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), { minStock: val }); 
+                else { const item = window.localData.items.find(x => x.id === id); if (item) item.minStock = val; }
+                window.closeModal('min-stock-modal'); window.renderView('inventory-status');
+            } catch(e){window.alertError(e.message)} 
+        };
+
+        window.saveEditLot = async () => {
+            const stockId = document.getElementById('edit-lot-id').value;
+            const itemId = document.getElementById('edit-lot-item-id').value;
+            const newExp = document.getElementById('edit-lot-exp').value || '-';
+            const newLoc = document.getElementById('edit-lot-loc').value || '';
+            try {
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { expDate: newExp, location: newLoc });
+                else { const stock = window.localData.stock.find(x => x.id === stockId); if (stock) { stock.expDate = newExp; stock.location = newLoc; } }
+                window.closeModal('edit-lot-modal'); window.alertSuccess('อัปเดตข้อมูล Lot สำเร็จ'); window.openItemDetailModal(itemId); 
+            } catch(e) { window.alertError(e.message); }
+        };
+
+        window.receiveItem = async (d) => { 
+            const t=new Date().toISOString().split('T')[0], item = window.localData.items.find(x => String(x.id) === String(d.itemId)); 
+            if(!item) return window.alertError("ไม่พบข้อมูลสินค้า"); 
+            const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; 
+            try { 
+                if(window.db_addDoc && window.db_collection && window.db && window.appId) {
+                    const stockRef = await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
+                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
+                } else {
+                    const newId = Date.now().toString();
+                    window.localData.stock.push({ id: newId, itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() });
+                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, newId);
+                }
+                return true;
+            } catch(e){ throw e; } 
+        };
+
+        window.logTrans = async function(type, itemId, lotNo, qty, unit, note, cDate, stockId) { 
+            const i = window.localData.items.find(x=>String(x.id) === String(itemId)); 
+            const data = { 
+                type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
+                unit: unit || (i ? i.unit : '-'), actionBy: window.appState.currentUser.name, note: note||'-', 
+                date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), timestamp: Date.now(), 
+                status: 'ACTIVE', stockId: stockId || null
+            };
+            if(window.db_addDoc && window.db_collection && window.db && window.appId) {
+                await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/transactions`), data); 
+            } else {
+                data.id = Date.now().toString(); window.localData.transactions.unshift(data);
+            }
+        };
+
+        window.executeQC = async (id, act) => { 
+            const s = window.localData.stock.find(x=>x.id===id); 
+            if(!s) return; 
+            const sampleInput = document.getElementById('qc-sample-' + id);
+            const remarkInput = document.getElementById('qc-remark-' + id);
+            const sampleQty = parseFloat(sampleInput.value) || 0;
+            const remarkText = remarkInput.value.trim() || '-';
+            if (sampleQty < 0 || sampleQty > s.qty) return window.alertError('จำนวนที่นำไปทดสอบไม่ถูกต้อง (ต้องไม่ติดลบและไม่เกินจำนวนรอตรวจ)');
+            let st = act === 'PASS' ? 'AVAILABLE' : (act === 'HOLD' ? 'HOLD' : 'REJECT'); 
+            try { 
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, id), { status: st }); 
+                } else { s.status = st; }
+                const noteMsg = `สถานะ: ${st} | หยิบตัวอย่างทดสอบ: ${sampleQty} ${s.unit} | หมายเหตุ: ${remarkText}`;
+                await window.logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, noteMsg, null, id); 
+                window.alertSuccess('บันทึกผล QC เรียบร้อย (จำนวนสินค้าในระบบยังคงเท่าเดิม)'); window.renderView('qc-task');
+            } catch(e){ window.alertError(e.message) } 
+        };
+
+        window.processIssueBatch = async () => { 
+            if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return window.alertError('ข้อมูลไม่ครบ'); 
+            try { 
+                for(let c of window.appState.issueCart) {
+                    if (c.selectedLot !== 'AUTO') {
+                        const lots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.lotNo === c.selectedLot && s.status === 'AVAILABLE' && s.qty > 0);
+                        const tot = lots.reduce((sum, lot) => sum + lot.qty, 0);
+                        if (c.baseQty > tot) throw new Error(`สินค้า "${c.item.name}" Lot ${c.selectedLot} มีไม่พอเบิก (เหลือ ${tot})`);
+                    } else {
+                        const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.status === 'AVAILABLE' && s.qty > 0);
+                        const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
+                        if (c.baseQty > totalAvailable) throw new Error(`สินค้า "${c.item.name}" มีไม่เพียงพอในคลัง (เหลือ ${totalAvailable})`);
+                    }
+                }
+
+                for(let c of window.appState.issueCart) { 
+                    let lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate)); 
+                    if (c.selectedLot !== 'AUTO') { lots = lots.filter(s => s.lotNo === c.selectedLot); }
+                    let rem = c.baseQty; 
+                    for(let l of lots) { 
+                        if(rem<=0) break; 
+                        let deduct = Math.min(l.qty, rem); 
+                        if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                            await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); 
+                        } else { l.qty -= deduct; }
+                        await window.logTrans('ISSUE', c.itemId, l.lotNo, -deduct, l.unit, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
+                        rem -= deduct; 
+                    } 
+                } 
+                window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
+                window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
+            } catch(e){window.alertError(e.message)} 
+        };
+
+        window.voidTransaction = async (id) => {
+            const trans = window.localData.transactions.find(t => t.id === id);
+            if (!trans || trans.status === 'VOIDED') return;
+            if (window.appState.currentUser.role !== 'ADMIN') return window.alertError('ไม่มีสิทธิ์ Void รายการ (Admin Only)');
+            if (!confirm(`ต้องการยกเลิกรายการนี้? ระบบจะทำการคืนสต็อกจำนวน ${Math.abs(trans.qty)} หน่วย เข้าสู่ Lot ${trans.lot}`)) return;
+            try {
+                let stockDoc = window.localData.stock.find(s => s.id === trans.stockId);
+                if (!stockDoc) stockDoc = window.localData.stock.find(s => String(s.itemId) === String(trans.itemId) && s.lotNo === trans.lot);
+
+                if (trans.type === 'RECEIVE') {
+                    if (stockDoc) {
+                        const newQty = Math.max(0, stockDoc.qty - trans.qty);
+                        if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockDoc.id), { qty: newQty });
+                        else stockDoc.qty = newQty;
+                    }
+                } else if (trans.type === 'ISSUE') {
+                    if (stockDoc) {
+                        if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockDoc.id), { qty: stockDoc.qty + Math.abs(trans.qty) });
+                        else stockDoc.qty += Math.abs(trans.qty);
+                    } else { return window.alertError("ไม่พบข้อมูล Lot เดิมในระบบ ไม่สามารถคืนค่าสต็อกได้"); }
+                }
+
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/transactions`, id), { status: 'VOIDED', voidBy: window.appState.currentUser.name, voidAt: new Date().toLocaleString('th-TH') });
+                } else {
+                    trans.status = 'VOIDED'; trans.voidBy = window.appState.currentUser.name; trans.voidAt = new Date().toLocaleString('th-TH');
+                }
+                window.alertSuccess('ยกเลิกรายการและคืนสต็อกสำเร็จ'); window.renderView('history');
+            } catch (e) { window.alertError("Void Error: " + e.message); }
+        };
+
+        window.saveProfile = async () => { const id=document.getElementById('profile-id').value, name=document.getElementById('profile-name').value, pass=document.getElementById('profile-password').value, dObj={name}; if(pass)dObj.password=pass; try { if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db,`artifacts/${window.appId}/public/data/users`,id),dObj); else { const u = window.localData.users.find(x=>x.id===id); if(u) Object.assign(u, dObj); } window.appState.currentUser.name=name; window.closeModal('profile-modal'); window.alertSuccess('บันทึกแล้ว'); }catch(e){window.alertError(e.message)} };
+        window.handleCreateUser = async (e) => { e.preventDefault(); const d=new FormData(e.target); if(window.localData.users.find(u=>u.username===d.get('new_username')))return window.alertError('Username ซ้ำ'); try { if(window.db_addDoc && window.db_collection && window.db && window.appId) await window.db_addDoc(window.db_collection(window.db,`artifacts/${window.appId}/public/data/users`),{username:d.get('new_username'),password:d.get('new_password'),name:d.get('new_name'),role:d.get('new_role')}); else window.localData.users.push({id:Date.now().toString(), username:d.get('new_username'),password:d.get('new_password'),name:d.get('new_name'),role:d.get('new_role')}); window.closeModal('user-manage-modal'); window.alertSuccess('สร้างแล้ว'); window.renderView('user-list'); }catch(e){window.alertError(e.message)} };
+        window.deleteUser = async (id) => { if(confirm('ลบผู้ใช้งานนี้?')) { try { if(window.db_deleteDoc && window.db_doc && window.db && window.appId) await window.db_deleteDoc(window.db_doc(window.db,`artifacts/${window.appId}/public/data/users`,id)); else window.localData.users = window.localData.users.filter(x=>x.id!==id); window.alertSuccess('ลบแล้ว'); window.renderView('user-list'); }catch(e){window.alertError(e.message)} } };
+        window.deleteTransaction = async (id) => { if (window.appState.currentUser.role !== 'ADMIN') return window.alertError('ไม่มีสิทธิ์'); if (confirm('ลบประวัติรายการนี้ถาวร? (จะไม่มีการคืนสต็อก)')) { try { if(window.db_deleteDoc && window.db_doc && window.db && window.appId) await window.db_deleteDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/transactions`, id)); else window.localData.transactions = window.localData.transactions.filter(x=>x.id!==id); window.alertSuccess('ลบประวัติสำเร็จ'); window.renderView('history'); } catch (e) { window.alertError(e.message); } } };
+
+        // --- SEARCH INPUT & DROPDOWN ---
         window.renderSearchableItemInput = function(cid) { 
             return `
                 <div class="relative group w-full" id="search-container-${cid}">
@@ -449,40 +689,25 @@
             document.getElementById('search-input-' + cid).value = `${c} : ${n}`; 
             document.getElementById('dropdown-list-' + cid).classList.add('hidden'); 
             document.getElementById('clear-btn-' + cid).classList.remove('hidden'); 
-            
-            if (cid === 'issue-item') {
-                window.updateIssueLotDropdown(id);
-            }
+            if (cid === 'issue-item') window.updateIssueLotDropdown(id);
         };
 
         window.clearSelection = function(cid) { 
             document.getElementById('hidden-item-id-' + cid).value = ''; 
             document.getElementById('search-input-' + cid).value = ''; 
             document.getElementById('clear-btn-' + cid).classList.add('hidden'); 
-            
-            if (cid === 'issue-item') {
-                window.updateIssueLotDropdown('');
-            }
+            if (cid === 'issue-item') window.updateIssueLotDropdown('');
         };
 
         window.updateIssueLotDropdown = function(itemId) {
             const lotSelect = document.getElementById('input-lot-no');
             if (!lotSelect) return;
-
-            if (!itemId) {
-                lotSelect.innerHTML = '<option value="">-- เลือกสินค้าก่อน --</option>';
-                return;
-            }
-
+            if (!itemId) { lotSelect.innerHTML = '<option value="">-- เลือกสินค้าก่อน --</option>'; return; }
             const item = window.localData.items.find(x => String(x.id) === String(itemId));
             if(!item) return;
 
             const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.status === 'AVAILABLE' && s.qty > 0);
-
-            if (availableLots.length === 0) {
-                lotSelect.innerHTML = '<option value="">-- ไม่มีสต็อกพร้อมใช้ --</option>';
-                return;
-            }
+            if (availableLots.length === 0) { lotSelect.innerHTML = '<option value="">-- ไม่มีสต็อกพร้อมใช้ --</option>'; return; }
 
             const lotMap = {};
             availableLots.forEach(s => {
@@ -494,42 +719,39 @@
             for (const [lotNo, qty] of Object.entries(lotMap)) {
                 opts += `<option value="${lotNo}">${lotNo} (เหลือ ${qty.toLocaleString(undefined, {maximumFractionDigits:2})} ${item.unit})</option>`;
             }
-            
             lotSelect.innerHTML = opts;
         };
 
-        // --- HELPER FUNCTIONS FOR UI HANDLERS ---
-        window.openMinStockModal = (id) => {
+        window.printItemBarcode = function(id) {
             const item = window.localData.items.find(x => String(x.id) === String(id));
-            if(!item) return;
-            document.getElementById('modal-item-id').value = id;
-            document.getElementById('modal-item-name').innerText = `${item.code} : ${item.name}`;
-            document.getElementById('modal-min-stock-input').value = item.minStock || 0;
-            document.getElementById('min-stock-modal').classList.remove('hidden');
-        };
-
-        window.openEditItemModal = (id) => {
-            const item = window.localData.items.find(x => String(x.id) === String(id));
-            if(!item) return;
-            document.getElementById('edit-item-id').value = id;
-            document.getElementById('edit-item-code').value = item.code;
-            document.getElementById('edit-item-name').value = item.name;
-            document.getElementById('edit-item-type').value = item.type;
-            document.getElementById('edit-item-unit').value = item.unit;
-            document.getElementById('edit-item-min').value = item.minStock || 0;
-            document.getElementById('edit-item-modal').classList.remove('hidden');
-        };
-
-        window.openEditLotModal = (stockId, itemId) => {
-            if (!window.checkPerm('manage_item')) return window.alertError('คุณไม่มีสิทธิ์แก้ไขข้อมูล Lot');
-            const s = window.localData.stock.find(x => String(x.id) === String(stockId));
-            if(!s) return;
-            document.getElementById('edit-lot-id').value = stockId;
-            document.getElementById('edit-lot-item-id').value = itemId;
-            document.getElementById('edit-lot-no').value = s.lotNo;
-            document.getElementById('edit-lot-exp').value = (s.expDate === '-' || !s.expDate) ? '' : s.expDate;
-            document.getElementById('edit-lot-loc').value = s.location || '';
-            document.getElementById('edit-lot-modal').classList.remove('hidden');
+            if (!item) return;
+            const printWin = window.open('', '_blank');
+            const html = `
+                <html>
+                <head>
+                    <title>Print Barcode - ${item.code}</title>
+                    <style>
+                        @page { margin: 0; size: 50mm 30mm; } 
+                        body { margin: 0; padding: 2mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Sarabun', sans-serif; height: 100vh; box-sizing: border-box; }
+                        .name { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+                        .type { font-size: 9px; padding: 1px 3px; border-radius: 3px; margin-bottom: 2px; }
+                        svg { max-width: 100%; max-height: 20mm; }
+                    </style>
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+                </head>
+                <body>
+                    <div class="name">${item.name}</div>
+                    <div class="type">${item.type}</div>
+                    <svg id="barcode"></svg>
+                    <script>
+                        JsBarcode("#barcode", "${item.code}", { format: "CODE128", width: 1.5, height: 40, displayValue: true, fontSize: 12, margin: 0 });
+                        window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); };
+                    <\/script>
+                </body>
+                </html>
+            `;
+            printWin.document.write(html);
+            printWin.document.close();
         };
 
         window.openItemDetailModal = (itemId) => {
@@ -606,7 +828,6 @@
         window.openQCDetailModal = (transId) => {
             const t = window.localData.transactions.find(x => x.id === transId);
             if (!t) return;
-            
             const parts = (t.item || '').split(' - ');
             const code = parts[0] || '?';
             const name = parts.slice(1).join(' - ') || '?';
@@ -623,159 +844,48 @@
             if (t.note && t.note.includes('หยิบตัวอย่างทดสอบ:')) {
                 const noteParts = t.note.split(' | ');
                 noteParts.forEach(p => {
-                    if (p.startsWith('หยิบตัวอย่างทดสอบ:')) {
-                        sampleText = p.replace('หยิบตัวอย่างทดสอบ:', '').trim();
-                    } else if (p.startsWith('หมายเหตุ:')) {
-                        noteText = p.replace('หมายเหตุ:', '').trim();
-                    }
+                    if (p.startsWith('หยิบตัวอย่างทดสอบ:')) { sampleText = p.replace('หยิบตัวอย่างทดสอบ:', '').trim(); } 
+                    else if (p.startsWith('หมายเหตุ:')) { noteText = p.replace('หมายเหตุ:', '').trim(); }
                 });
             }
 
             document.getElementById('qc-detail-badge').className = `inline-block px-4 py-1.5 rounded-full text-sm font-bold mb-3 shadow-sm border ${badgeCls}`;
             document.getElementById('qc-detail-badge').innerHTML = `<i class="fas ${badgeIcon} mr-2"></i>${badgeText}`;
-            
             document.getElementById('qc-detail-code').innerText = code;
             document.getElementById('qc-detail-name').innerText = name;
-            
             document.getElementById('qc-detail-lot').innerText = t.lot;
             document.getElementById('qc-detail-by').innerText = t.actionBy;
             document.getElementById('qc-detail-date').innerText = t.date;
-            
             document.getElementById('qc-detail-sample').innerText = sampleText;
             document.getElementById('qc-detail-note').innerText = noteText || '-';
-            
             document.getElementById('qc-detail-modal').classList.remove('hidden');
         };
 
-        window.handleAddIssueItem = () => {
-            const itemId = document.getElementById('hidden-item-id-issue-item').value;
-            const lotNo = document.getElementById('input-lot-no').value; 
-            const qtyInput = document.getElementById('input-qty').value;
-            const qty = parseFloat(qtyInput);
-            const unit = document.getElementById('input-unit').value;
-            
-            if(!itemId || !lotNo || isNaN(qty) || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน หรือไม่มีสต็อกให้เบิก");
-
-            const item = window.localData.items.find(x => String(x.id) === String(itemId));
-            if(!item) return;
-
-            const factor = window.getConversionFactor(unit, item.unit);
-            const baseQty = qty * factor;
-
-            if (lotNo !== 'AUTO') {
-                const specificLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.lotNo === lotNo && s.status === 'AVAILABLE' && s.qty > 0);
-                const totalSpecific = specificLots.reduce((sum, lot) => sum + lot.qty, 0);
-                if (baseQty > totalSpecific) {
-                    return window.alertError(`Lot: ${lotNo} มีสินค้าไม่เพียงพอ!\nมีพร้อมใช้: ${totalSpecific.toFixed(2)} ${item.unit}\nที่คุณต้องการ: ${baseQty.toFixed(2)} ${item.unit}`);
-                }
-            } else {
-                const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.status === 'AVAILABLE' && s.qty > 0);
-                const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
-                if (baseQty > totalAvailable) {
-                    return window.alertError(`สินค้าไม่เพียงพอเบิก!\nมีพร้อมใช้รวมทั้งหมด: ${totalAvailable.toFixed(2)} ${item.unit}\nที่คุณต้องการ: ${baseQty.toFixed(2)} ${item.unit}`);
-                }
-            }
-
-            window.appState.issueCart.push({
-                itemId, item, selectedLot: lotNo, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit
-            });
-
-            document.getElementById('input-qty').value = '';
-            window.clearSelection('issue-item');
-            window.renderView('issue');
+        window.openUserManageModal = function() {
+            if (!window.appState.currentUser || window.appState.currentUser.role !== 'ADMIN') return window.alertError('Admin Only');
+            document.getElementById('user-manage-modal').classList.remove('hidden');
         };
 
-        window.removeFromIssueCart = (idx) => {
-            window.appState.issueCart.splice(idx, 1);
-            window.renderView('issue');
+        window.openProfileModal = function() {
+            const u = window.appState.currentUser;
+            if(!u) return;
+            document.getElementById('profile-id').value = u.id || '';
+            document.getElementById('profile-username').value = u.username || '';
+            document.getElementById('profile-name').value = u.name || '';
+            document.getElementById('profile-password').value = '';
+            document.getElementById('profile-modal').classList.remove('hidden');
         };
 
-        window.handleReceiveExcelImport = function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                    if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
-                    
-                    let successCount = 0;
-                    let errorCount = 0;
-                    
-                    for (const row of jsonData) {
-                        const code = (row["รหัสสินค้า"] || row["Code"] || "").toString().trim().toUpperCase();
-                        const lotNo = (row["Lot No"] || row["Lot"] || "OLD-DATA").toString().trim();
-                        const qty = parseFloat(row["จำนวน"] || row["Qty"] || 0);
-                        const unit = (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase();
-                        const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
-                        const location = (row["Location"] || row["Loc"] || "MAIN").toString().trim();
-
-                        const item = window.localData.items.find(i => i.code === code);
-                        
-                        if (item && qty > 0) {
-                            await window.receiveItem({
-                                itemId: item.id,
-                                lotNo: lotNo,
-                                qty: qty,
-                                unit: unit,
-                                expDate: expDate,
-                                location: location
-                            });
-                            successCount++;
-                        } else {
-                            errorCount++;
-                        }
-                    }
-                    
-                    alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ${errorCount > 0 ? " (ข้าม " + errorCount + " รายการเนื่องจากไม่พบรหัสสินค้า)" : ""}`);
-                    event.target.value = ''; 
-                    window.renderView('receive');
-                } catch (err) { alertError("Error: " + err.message); }
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
-        window.closeModal = (id) => {
-            const el = document.getElementById(id);
-            if(el) el.classList.add('hidden');
-        };
+        // --- FILTER & MISC HANDLERS ---
+        window.setInventoryFilter = (f) => { window.appState.inventoryFilter = f; window.refreshView(); };
+        window.toggleLowStockFilter = () => { window.appState.inventoryLowStockOnly = !window.appState.inventoryLowStockOnly; window.refreshView(); };
+        window.toggleExpiringSoonFilter = () => { window.appState.inventoryExpiringSoonOnly = !window.appState.inventoryExpiringSoonOnly; window.refreshView(); };
+        window.setHistoryFilter = (f) => { window.appState.historyFilter = f; window.refreshView(); };
+        window.setHistoryMonthFilter = (monthVal) => { window.appState.historyFilterMonth = monthVal; window.refreshView(); };
+        window.setHistoryLotFilter = (lotVal) => { window.appState.historyFilterLot = lotVal; window.refreshView(); };
+        window.switchQCTab = (tab) => { window.appState.qcTab = tab; window.refreshView(); };
+        window.updateReceiveHistoryFilter = (date) => { window.appState.receiveHistoryFilterDate = date; window.refreshView(); };
         
-        window.alertSuccess = (m) => alert("✅ " + m); 
-        window.alertError = (m) => alert("❌ " + m);
-
-        window.setInventoryFilter = (f) => { 
-            window.appState.inventoryFilter = f; 
-            if(window.appState.currentView === 'inventory-status') window.renderView('inventory-status'); 
-        };
-        
-        window.toggleLowStockFilter = () => { 
-            window.appState.inventoryLowStockOnly = !window.appState.inventoryLowStockOnly; 
-            if(window.appState.currentView === 'inventory-status') window.renderView('inventory-status'); 
-        };
-
-        window.toggleExpiringSoonFilter = () => {
-            window.appState.inventoryExpiringSoonOnly = !window.appState.inventoryExpiringSoonOnly;
-            if(window.appState.currentView === 'inventory-status') window.renderView('inventory-status');
-        };
-
-        window.setHistoryFilter = (f) => { 
-            window.appState.historyFilter = f; 
-            if(window.appState.currentView === 'history') window.renderView('history'); 
-        };
-
-        window.setHistoryMonthFilter = (monthVal) => {
-            window.appState.historyFilterMonth = monthVal;
-            if(window.appState.currentView === 'history') window.renderView('history');
-        };
-        
-        window.setHistoryLotFilter = (lotVal) => {
-            window.appState.historyFilterLot = lotVal;
-            if(window.appState.currentView === 'history') window.renderView('history');
-        };
-
         window.filterInventoryTable = () => { 
             const f = document.getElementById('inventory-search').value.toLowerCase(); 
             document.querySelectorAll('.item-row').forEach(r => {
@@ -789,6 +899,14 @@
             return units[`${to}_${from}`] || 1; 
         };
 
+        window.removeFromIssueCart = (idx) => {
+            window.appState.issueCart.splice(idx, 1);
+            window.refreshView();
+        };
+
+        window.handleItemMasterSearch = function(val) { window.appState.itemMasterSearch = val; window.appState.itemMasterPage = 1; window.updateItemMasterTable(); };
+        window.changeItemMasterPage = function(delta) { window.appState.itemMasterPage += delta; window.updateItemMasterTable(); };
+
         window.printStockCheckSheet = function() {
             const currentFilter = window.appState.inventoryFilter;
             const isLowOnly = window.appState.inventoryLowStockOnly;
@@ -801,7 +919,7 @@
                 if (isLowOnly && !isLow) return null;
                 return { code: i.code, name: i.name, balance: tot.toFixed(2), unit: i.unit };
             }).filter(x => x !== null);
-            if (printData.length === 0) return alertError("ไม่มีข้อมูลสำหรับพิมพ์");
+            if (printData.length === 0) return window.alertError("ไม่มีข้อมูลสำหรับพิมพ์");
             const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             const html = `
                 <div style="font-family: 'Sarabun', sans-serif; padding: 10px; font-size: 12px;">
@@ -834,7 +952,7 @@
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                    if (jsonData.length === 0) return alertError("ไฟล์ว่างเปล่า");
+                    if (jsonData.length === 0) return window.alertError("ไฟล์ว่างเปล่า");
                     let successCount = 0;
                     for (const row of jsonData) {
                         const item = {
@@ -851,426 +969,85 @@
                             }
                         }
                     }
-                    alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ`);
+                    window.alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ`);
                     event.target.value = ''; 
                     window.renderView('item-master');
-                } catch (err) { alertError("Error: " + err.message); }
+                } catch (err) { window.alertError("Error: " + err.message); }
             };
             reader.readAsArrayBuffer(file);
         };
 
-        window.updateReceiveHistoryFilter = (date) => {
-            window.appState.receiveHistoryFilterDate = date;
-            window.renderView('receive');
-        };
-
-        window.handleItemMasterSearch = function(val) {
-            window.appState.itemMasterSearch = val;
-            window.appState.itemMasterPage = 1; 
-            window.updateItemMasterTable();
-        };
-
-        window.changeItemMasterPage = function(delta) {
-            window.appState.itemMasterPage += delta;
-            window.updateItemMasterTable(); 
-        };
-
-        window.updateItemMasterTable = function() {
-            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
-            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
-            let filteredItems = window.localData.items;
-            if (searchTerm) {
-                filteredItems = filteredItems.filter(i => i.code.toLowerCase().includes(searchTerm) || i.name.toLowerCase().includes(searchTerm));
-            }
+        window.handleAddIssueItem = () => {
+            const itemId = document.getElementById('hidden-item-id-issue-item').value;
+            const lotNo = document.getElementById('input-lot-no').value; 
+            const qtyInput = document.getElementById('input-qty').value;
+            const qty = parseFloat(qtyInput);
+            const unit = document.getElementById('input-unit').value;
             
-            const itemsPerPage = 50;
-            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
-            let currentPage = window.appState.itemMasterPage || 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-            
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+            if(!itemId || !lotNo || isNaN(qty) || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน หรือไม่มีสต็อกให้เบิก");
 
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
-            
-            const tbody = document.getElementById('item-master-tbody');
-            if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
+            const item = window.localData.items.find(x => String(x.id) === String(itemId));
+            if(!item) return;
 
-            const pagination = document.getElementById('item-master-pagination');
-            if (pagination) {
-                pagination.innerHTML = `
-                    <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
-                    <div class="flex items-center gap-2">
-                        <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
-                        <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
-                        <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-                    </div>`;
-            }
-        };
+            const factor = window.getConversionFactor(unit, item.unit);
+            const baseQty = qty * factor;
 
-        window.downloadItemTemplate = function() {
-            const data = [
-                { "รหัสสินค้า": "ITM-001", "ชื่อสินค้า": "ตัวอย่างวัตถุดิบ 1", "ประเภท": "RM", "หน่วย": "kg", "Min Stock": 10 },
-                { "รหัสสินค้า": "ITM-002", "ชื่อสินค้า": "ตัวอย่างสินค้าสำเร็จรูป", "ประเภท": "FG", "หน่วย": "pcs", "Min Stock": 5 }
-            ];
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Items");
-            XLSX.writeFile(wb, "Item_Master_Template.xlsx");
-        };
-
-        window.downloadReceiveTemplate = function() {
-            const data = [
-                { "รหัสสินค้า": "ITM-001", "Lot No": "L-2401-01", "จำนวน": 100, "หน่วย": "kg", "วันหมดอายุ": "2025-12-31", "Location": "A-01" },
-                { "รหัสสินค้า": "ITM-002", "Lot No": "L-2401-02", "จำนวน": 50, "หน่วย": "pcs", "วันหมดอายุ": "-", "Location": "B-02" }
-            ];
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Receive");
-            XLSX.writeFile(wb, "Receive_Stock_Template.xlsx");
-        };
-
-        window.refreshView = function() { 
-            if(window.appState.currentUser && typeof window.renderView === 'function') {
-                window.renderView(window.appState.currentView); 
-            }
-        };
-    </script>
-
-    <!-- SCRIPT 2: FIREBASE MODULE -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-        let firebaseConfig;
-        try {
-            firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-                apiKey: "AIzaSyAqOMC8fVaRMDB5aPpoImYSVFwjU1d_99k",
-                authDomain: "onsetstock.firebaseapp.com",
-                projectId: "onsetstock",
-                storageBucket: "onsetstock.firebasestorage.app",
-                messagingSenderId: "159241390751",
-                appId: "1:159241390751:web:58bef364f4678621ac70aa"
-            });
-        } catch (e) {
-            console.error("Config parsing error", e);
-        }
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : (typeof __app_id !== 'undefined' ? __app_id : 'factory-os-main'); 
-
-        window.auth = auth; window.db = db; window.appId = appId;
-        window.db_doc = doc; window.db_setDoc = setDoc; window.db_getDoc = getDoc; window.db_deleteDoc = deleteDoc;
-
-        // Force hide loading screen after 10s if stuck
-        setTimeout(() => {
-            const loader = document.getElementById('loading-screen');
-            if(loader && !loader.classList.contains('hidden')) {
-                loader.classList.add('hidden');
-                document.getElementById('login-view').classList.remove('hidden');
-                const err = document.getElementById('login-error');
-                err.innerText = "การเชื่อมต่อฐานข้อมูลใช้เวลานานผิดปกติ กรุณาเช็คอินเทอร์เน็ตหรือรีเฟรชหน้าจอ";
-                err.classList.remove('hidden');
-            }
-        }, 10000);
-
-        async function initApp() {
-            try {
-                let token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null);
-                if (token) {
-                    try {
-                        await signInWithCustomToken(auth, token);
-                    } catch (tokenError) {
-                        console.warn("Custom token failed, falling back to anonymous auth:", tokenError);
-                        await signInAnonymously(auth);
-                    }
-                } else {
-                    await signInAnonymously(auth);
+            if (lotNo !== 'AUTO') {
+                const specificLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.lotNo === lotNo && s.status === 'AVAILABLE' && s.qty > 0);
+                const totalSpecific = specificLots.reduce((sum, lot) => sum + lot.qty, 0);
+                if (baseQty > totalSpecific) {
+                    return window.alertError(`Lot: ${lotNo} มีสินค้าไม่เพียงพอ!\nมีพร้อมใช้: ${totalSpecific.toFixed(2)} ${item.unit}\nที่คุณต้องการ: ${baseQty.toFixed(2)} ${item.unit}`);
                 }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        setupFirestoreListeners(user);
-                    } else {
-                        document.getElementById('loading-screen').classList.add('hidden');
-                        document.getElementById('login-view').classList.remove('hidden');
-                    }
-                });
-            } catch (e) { 
-                console.error("Firebase Auth Init Error:", e); 
-                document.getElementById('loading-screen').classList.add('hidden');
-                document.getElementById('login-view').classList.remove('hidden');
-                document.getElementById('login-error').innerText = "Auth Error: " + e.message;
-                document.getElementById('login-error').classList.remove('hidden');
-            }
-        }
-
-        function setupFirestoreListeners(user) {
-            if (!user) return;
-            const basePath = `artifacts/${appId}/public/data`;
-            
-            const handleError = (err) => {
-                console.error("Firestore Listen Error:", err);
-                document.getElementById('loading-screen').classList.add('hidden');
-                if(!window.appState.currentUser) {
-                    document.getElementById('login-view').classList.remove('hidden');
-                    document.getElementById('login-error').innerText = "Database Error: " + err.message;
-                    document.getElementById('login-error').classList.remove('hidden');
-                }
-            };
-
-            onSnapshot(collection(db, basePath, 'items'), (s) => { 
-                window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); 
-                if(window.refreshView) window.refreshView(); 
-            }, handleError);
-            
-            onSnapshot(collection(db, basePath, 'stock'), (s) => { 
-                window.localData.stock = s.docs.map(d=>({id:d.id,...d.data()})); 
-                if(window.refreshView) window.refreshView(); 
-            }, handleError);
-            
-            onSnapshot(collection(db, basePath, 'transactions'), (s) => { 
-                window.localData.transactions = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)); 
-                if(window.refreshView) window.refreshView(); 
-            }, handleError);
-            
-            onSnapshot(collection(db, basePath, 'users'), async (s) => { 
-                window.localData.users = s.docs.map(d=>({id:d.id,...d.data()}));
-                const seeds = [{u:'admin',p:'1234',n:'System Admin',r:'ADMIN'},{u:'stock',p:'1234',n:'Stock Manager',r:'STOCK'},{u:'qc',p:'1234',n:'QC Inspector',r:'QC'}];
-                for (const u of seeds) { 
-                    if (!window.localData.users.find(x => x.username === u.u)) { 
-                        try { await addDoc(collection(db, basePath, 'users'), {username:u.u,password:u.p,name:u.n,role:u.r}); } catch(e){ console.warn("Seed users error", e); } 
-                    } 
-                }
-                
-                try {
-                    const sessDoc = await getDoc(doc(db, `artifacts/${appId}/users/${user.uid}/session`, 'current'));
-                    if (sessDoc.exists()) {
-                        const data = sessDoc.data();
-                        const loggedUser = window.localData.users.find(u => u.username === data.username);
-                        if (loggedUser) {
-                            window.appState.currentUser = loggedUser;
-                            document.getElementById('login-view').classList.add('hidden');
-                            document.getElementById('app-layout').classList.remove('hidden');
-                            document.getElementById('app-layout').classList.remove('opacity-0');
-                            const hash = window.location.hash.substring(1);
-                            if(typeof window.renderView === 'function') window.renderView(hash || 'dashboard');
-                        }
-                    }
-                } catch(e) { console.error("Session sync error:", e); }
-
-                if(window.refreshView) window.refreshView(); 
-                document.getElementById('loading-screen').classList.add('hidden');
-                if(!window.appState.currentUser) document.getElementById('login-view').classList.remove('hidden');
-            }, handleError);
-        }
-
-        initApp();
-
-        window.createItem = async (d, silent=false) => { 
-            try { 
-                await addDoc(collection(db, `artifacts/${appId}/public/data/items`), { code: d.code.toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); 
-                if(!silent) { window.alertSuccess('สำเร็จ'); window.renderView('item-master'); }
-            } catch(e){ if(!silent) window.alertError(e.message); } 
-        };
-        window.deleteItem = async (id) => { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/items`, id)); window.alertSuccess('ลบแล้ว'); } catch(e){window.alertError(e.message)} };
-        window.saveEditItem = async () => { const id=document.getElementById('edit-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) }); window.closeModal('edit-item-modal'); window.alertSuccess('แก้ไขแล้ว'); } catch(e){window.alertError(e.message)} };
-        window.saveMinStockModal = async () => { const id=document.getElementById('modal-item-id').value; try { await updateDoc(doc(db, `artifacts/${appId}/public/data/items`, id), { minStock: parseInt(document.getElementById('modal-min-stock-input').value) }); window.closeModal('min-stock-modal'); } catch(e){window.alertError(e.message)} };
-        
-        window.saveEditLot = async () => {
-            const stockId = document.getElementById('edit-lot-id').value;
-            const itemId = document.getElementById('edit-lot-item-id').value;
-            const newExp = document.getElementById('edit-lot-exp').value || '-';
-            const newLoc = document.getElementById('edit-lot-loc').value || '';
-            try {
-                await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockId), {
-                    expDate: newExp,
-                    location: newLoc
-                });
-                window.closeModal('edit-lot-modal');
-                window.alertSuccess('อัปเดตข้อมูล Lot สำเร็จ');
-                window.openItemDetailModal(itemId); // Refresh modal
-            } catch(e) {
-                window.alertError(e.message);
-            }
-        };
-
-        window.receiveItem = async (d) => { 
-            const t=new Date().toISOString().split('T')[0], item = window.localData.items.find(x => String(x.id) === String(d.itemId)); 
-            if(!item) return window.alertError("ไม่พบข้อมูลสินค้า"); 
-            const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; 
-            try { 
-                const stockRef = await addDoc(collection(db, `artifacts/${appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
-                await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
-                return true;
-            } catch(e){ throw e; } 
-        };
-
-        window.logTrans = async function(type, itemId, lotNo, qty, unit, note, cDate, stockId) { 
-            const i = window.localData.items.find(x=>String(x.id) === String(itemId)); 
-            await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), { 
-                type, itemId, item: i?`${i.code} - ${i.name}`:'?', lot: lotNo, qty, 
-                unit: unit || (i ? i.unit : '-'), 
-                actionBy: window.appState.currentUser.name, note: note||'-', 
-                date: (cDate?new Date(cDate):new Date()).toLocaleString('th-TH'), 
-                timestamp: Date.now(), 
-                status: 'ACTIVE',
-                stockId: stockId || null
-            }); 
-        };
-
-        window.executeQC = async (id, act) => { 
-            const s = window.localData.stock.find(x=>x.id===id); 
-            if(!s) return; 
-            
-            const sampleInput = document.getElementById('qc-sample-' + id);
-            const remarkInput = document.getElementById('qc-remark-' + id);
-            
-            const sampleQty = parseFloat(sampleInput.value) || 0;
-            const remarkText = remarkInput.value.trim() || '-';
-
-            if (sampleQty < 0 || sampleQty > s.qty) {
-                return window.alertError('จำนวนที่นำไปทดสอบไม่ถูกต้อง (ต้องไม่ติดลบและไม่เกินจำนวนรอตรวจ)');
-            }
-
-            let st = act === 'PASS' ? 'AVAILABLE' : (act === 'HOLD' ? 'HOLD' : 'REJECT'); 
-
-            try { 
-                await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, id), { status: st }); 
-                const noteMsg = `สถานะ: ${st} | หยิบตัวอย่างทดสอบ: ${sampleQty} ${s.unit} | หมายเหตุ: ${remarkText}`;
-                await window.logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, noteMsg, null, id); 
-                
-                window.alertSuccess('บันทึกผล QC เรียบร้อย (จำนวนสินค้าในระบบยังคงเท่าเดิม)'); 
-            } catch(e){ window.alertError(e.message) } 
-        };
-
-        window.processIssueBatch = async () => { 
-            if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return window.alertError('ข้อมูลไม่ครบ'); 
-            try { 
-                for(let c of window.appState.issueCart) {
-                    if (c.selectedLot !== 'AUTO') {
-                        const lots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.lotNo === c.selectedLot && s.status === 'AVAILABLE' && s.qty > 0);
-                        const tot = lots.reduce((sum, lot) => sum + lot.qty, 0);
-                        if (c.baseQty > tot) throw new Error(`สินค้า "${c.item.name}" Lot ${c.selectedLot} มีไม่พอเบิก (เหลือ ${tot})`);
-                    } else {
-                        const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.status === 'AVAILABLE' && s.qty > 0);
-                        const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
-                        if (c.baseQty > totalAvailable) throw new Error(`สินค้า "${c.item.name}" มีไม่เพียงพอในคลัง (เหลือ ${totalAvailable})`);
-                    }
-                }
-
-                for(let c of window.appState.issueCart) { 
-                    let lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>new Date(a.expDate)-new Date(b.expDate)); 
-                    
-                    if (c.selectedLot !== 'AUTO') {
-                        lots = lots.filter(s => s.lotNo === c.selectedLot);
-                    }
-
-                    let rem = c.baseQty; 
-                    for(let l of lots) { 
-                        if(rem<=0) break; 
-                        let deduct = Math.min(l.qty, rem); 
-                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); 
-                        await window.logTrans('ISSUE', c.itemId, l.lotNo, -deduct, l.unit, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
-                        rem -= deduct; 
-                    } 
-                } 
-                window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
-                window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
-            } catch(e){window.alertError(e.message)} 
-        };
-
-        window.voidTransaction = async (id) => {
-            const trans = window.localData.transactions.find(t => t.id === id);
-            if (!trans || trans.status === 'VOIDED') return;
-            if (window.appState.currentUser.role !== 'ADMIN') return window.alertError('ไม่มีสิทธิ์ Void รายการ (Admin Only)');
-            
-            if (!confirm(`ต้องการยกเลิกรายการนี้? ระบบจะทำการคืนสต็อกจำนวน ${Math.abs(trans.qty)} หน่วย เข้าสู่ Lot ${trans.lot}`)) return;
-
-            try {
-                let stockDoc = window.localData.stock.find(s => s.id === trans.stockId);
-                if (!stockDoc) {
-                    stockDoc = window.localData.stock.find(s => String(s.itemId) === String(trans.itemId) && s.lotNo === trans.lot);
-                }
-
-                if (trans.type === 'RECEIVE') {
-                    if (stockDoc) {
-                        const newQty = Math.max(0, stockDoc.qty - trans.qty);
-                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: newQty });
-                    }
-                } else if (trans.type === 'ISSUE') {
-                    if (stockDoc) {
-                        await updateDoc(doc(db, `artifacts/${appId}/public/data/stock`, stockDoc.id), { qty: stockDoc.qty + Math.abs(trans.qty) });
-                    } else {
-                        return window.alertError("ไม่พบข้อมูล Lot เดิมในระบบ ไม่สามารถคืนค่าสต็อกได้");
-                    }
-                }
-
-                await updateDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id), { 
-                    status: 'VOIDED',
-                    voidBy: window.appState.currentUser.name,
-                    voidAt: new Date().toLocaleString('th-TH')
-                });
-
-                window.alertSuccess('ยกเลิกรายการและคืนสต็อกสำเร็จ');
-            } catch (e) {
-                window.alertError("Void Error: " + e.message);
-            }
-        };
-
-        window.handleLogin = async function(e) {
-            e.preventDefault();
-            const d = new FormData(e.target);
-            const username = d.get('username');
-            const password = d.get('password');
-            const user = window.localData.users.find(u => u.username === username && u.password === password);
-            if (user) {
-                window.appState.currentUser = user;
-                if (window.auth && window.auth.currentUser) {
-                    const sessionPath = `artifacts/${window.appId}/users/${window.auth.currentUser.uid}/session`;
-                    await setDoc(doc(window.db, sessionPath, 'current'), { 
-                        username: user.username,
-                        timestamp: Date.now()
-                    });
-                }
-                document.getElementById('login-view').classList.add('hidden');
-                document.getElementById('app-layout').classList.remove('hidden');
-                setTimeout(()=>document.getElementById('app-layout').classList.remove('opacity-0'), 50);
-                window.renderView('dashboard');
             } else {
-                const err = document.getElementById('login-error');
-                err.innerText = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
-                err.classList.remove('hidden');
-            }
-        };
-
-        window.logout = async function() {
-            if(confirm('ออกจากระบบ?')) {
-                if (window.auth && window.auth.currentUser) {
-                    const sessionPath = `artifacts/${window.appId}/users/${window.auth.currentUser.uid}/session`;
-                    await deleteDoc(doc(window.db, sessionPath, 'current'));
+                const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.status === 'AVAILABLE' && s.qty > 0);
+                const totalAvailable = availableLots.reduce((sum, lot) => sum + lot.qty, 0);
+                if (baseQty > totalAvailable) {
+                    return window.alertError(`สินค้าไม่เพียงพอเบิก!\nมีพร้อมใช้รวมทั้งหมด: ${totalAvailable.toFixed(2)} ${item.unit}\nที่คุณต้องการ: ${baseQty.toFixed(2)} ${item.unit}`);
                 }
-                window.appState.currentUser = null;
-                document.getElementById('app-layout').classList.add('opacity-0');
-                setTimeout(() => {
-                    document.getElementById('app-layout').classList.add('hidden');
-                    document.getElementById('login-view').classList.remove('hidden');
-                    document.getElementById('login-error').classList.add('hidden');
-                }, 300);
             }
+
+            window.appState.issueCart.push({ itemId, item, selectedLot: lotNo, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit });
+            document.getElementById('input-qty').value = '';
+            window.clearSelection('issue-item');
+            window.refreshView();
         };
 
-        window.saveProfile = async () => { const id=document.getElementById('profile-id').value, name=document.getElementById('profile-name').value, pass=document.getElementById('profile-password').value, dObj={name}; if(pass)dObj.password=pass; try { await updateDoc(doc(db,`artifacts/${appId}/public/data/users`,id),dObj); window.appState.currentUser.name=name; window.closeModal('profile-modal'); window.alertSuccess('บันทึกแล้ว'); }catch(e){window.alertError(e.message)} };
-        window.handleCreateUser = async (e) => { e.preventDefault(); const d=new FormData(e.target); if(window.localData.users.find(u=>u.username===d.get('new_username')))return window.alertError('Username ซ้ำ'); try { await addDoc(collection(db,`artifacts/${appId}/public/data/users`),{username:d.get('new_username'),password:d.get('new_password'),name:d.get('new_name'),role:d.get('new_role')}); window.closeModal('user-manage-modal'); window.alertSuccess('สร้างแล้ว'); window.renderView('user-list'); }catch(e){window.alertError(e.message)} };
-        window.deleteUser = async (id) => { if(confirm('ลบผู้ใช้งานนี้?')) { try { await deleteDoc(doc(db,`artifacts/${appId}/public/data/users`,id)); window.alertSuccess('ลบแล้ว'); window.renderView('user-list'); }catch(e){window.alertError(e.message)} } };
-        window.deleteTransaction = async (id) => { if (window.appState.currentUser.role !== 'ADMIN') return window.alertError('ไม่มีสิทธิ์'); if (confirm('ลบประวัติรายการนี้ถาวร? (จะไม่มีการคืนสต็อก)')) { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id)); window.alertSuccess('ลบประวัติสำเร็จ'); window.renderView('history'); } catch (e) { window.alertError(e.message); } } };
+        window.handleReceiveExcelImport = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (jsonData.length === 0) return window.alertError("ไฟล์ว่างเปล่า");
+                    
+                    let successCount = 0, errorCount = 0;
+                    for (const row of jsonData) {
+                        const code = (row["รหัสสินค้า"] || row["Code"] || "").toString().trim().toUpperCase();
+                        const lotNo = (row["Lot No"] || row["Lot"] || "OLD-DATA").toString().trim();
+                        const qty = parseFloat(row["จำนวน"] || row["Qty"] || 0);
+                        const unit = (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase();
+                        const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
+                        const location = (row["Location"] || row["Loc"] || "MAIN").toString().trim();
+                        const item = window.localData.items.find(i => i.code === code);
+                        
+                        if (item && qty > 0) {
+                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, location: location });
+                            successCount++;
+                        } else { errorCount++; }
+                    }
+                    window.alertSuccess(`นำเข้าสำเร็จ ${successCount} รายการ${errorCount > 0 ? " (ข้าม " + errorCount + " รายการเนื่องจากไม่พบรหัสสินค้า)" : ""}`);
+                    event.target.value = ''; window.refreshView();
+                } catch (err) { window.alertError("Error: " + err.message); }
+            };
+            reader.readAsArrayBuffer(file);
+        };
     </script>
 
-    <!-- SCRIPT 3: RENDERERS -->
+    <!-- SCRIPT 2: RENDERERS (VIEWS) -->
     <script>
         window.renderView = (viewId) => {
             window.appState.currentView = viewId;
@@ -1293,11 +1070,7 @@
             else if(viewId==='user-list') content.innerHTML=renderUserList();
         };
 
-        const menuConfig = {
-            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
-            STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
-            QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'}]
-        };
+        function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex flex-col items-center"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2 text-center w-full">${t}</p><h3 class="text-3xl font-bold ${tc} text-center">${v.toLocaleString()}</h3></div><div class="mt-3 p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
 
         function renderDashboard() {
             let total=window.localData.items.length, low=0, qc=0, avail=0;
@@ -1307,11 +1080,9 @@
                 if(sum<=(i.minStock||0)&&(i.minStock||0)>0) { low++; lowStockItems.push({ ...i, currentStock: sum }); }
             });
             window.localData.stock.forEach(s=>{ if(s.qty>0){ const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); if(it){ if(s.status==='WAIT_QC')qc++; if(s.status==='AVAILABLE')avail++; } } });
-            
             const activeTrans = window.localData.transactions.filter(t => t.status !== 'VOIDED');
             const recentTrans = activeTrans.slice(0, 5);
             const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
-            
             return `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 text-center">
                     ${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}
@@ -1344,7 +1115,143 @@
                 </div>`;
         }
 
-        function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex flex-col items-center"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2 text-center w-full">${t}</p><h3 class="text-3xl font-bold ${tc} text-center">${v.toLocaleString()}</h3></div><div class="mt-3 p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
+        window.updateItemMasterTable = function() {
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
+            let filteredItems = window.localData.items;
+            if (searchTerm) {
+                filteredItems = filteredItems.filter(i => i.code.toLowerCase().includes(searchTerm) || i.name.toLowerCase().includes(searchTerm));
+            }
+            
+            const itemsPerPage = 50;
+            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
+            let currentPage = window.appState.itemMasterPage || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+            
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.printItemBarcode('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            
+            const tbody = document.getElementById('item-master-tbody');
+            if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
+
+            const pagination = document.getElementById('item-master-pagination');
+            if (pagination) {
+                pagination.innerHTML = `
+                    <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+                        <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
+                        <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+                    </div>`;
+            }
+        };
+
+        function renderItemMaster() {
+            const can = window.checkPerm('manage_item');
+            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
+            const getCount = (type) => window.localData.items.filter(i => i.type === type).length;
+            const form = can ? `
+                <div class="space-y-6 text-left">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="font-bold mb-4 text-slate-800 flex items-center"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้าใหม่</h3>
+                        <form onsubmit="window.handleCreateItem(event)" class="space-y-4">
+                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">รหัสสินค้า</label><input name="code" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
+                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ชื่อสินค้า</label><input name="name" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
+                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยหลัก</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
+                            </div>
+                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" value="0"></div>
+                            <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all">บันทึกสินค้า</button>
+                        </form>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูลสินค้า</h3>
+                        <div class="mb-4 bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
+                            <p class="text-[11px] font-bold text-blue-600 mb-1 leading-tight"><i class="fas fa-info-circle mr-1"></i> รูปแบบคอลัมน์ใน Excel:</p>
+                            <ul class="text-[10px] text-blue-500 list-disc list-inside space-y-0.5">
+                                <li><b>รหัสสินค้า</b> (Code) - จำเป็น</li>
+                                <li><b>ชื่อสินค้า</b> (Name) - จำเป็น</li>
+                                <li><b>ประเภท</b> (Type) - RM, FG, PKG</li>
+                                <li><b>หน่วย</b> (Unit) - kg, pcs, set, g, ml</li>
+                                <li><b>Min Stock</b> - ตัวเลขจุดสั่งซื้อ</li>
+                            </ul>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="window.downloadItemTemplate()" type="button" class="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-sm">
+                                <i class="fas fa-download"></i> โหลดเทมเพลต
+                            </button>
+                            <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
+                            <button onclick="document.getElementById('excel-file-input').click()" type="button" class="flex-1 bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-sm">
+                                <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>` : ``;
+            const stats = `
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Raw Material</span><span class="text-xl font-bold text-emerald-600">${getCount('RM')}</span></div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Packaging</span><span class="text-xl font-bold text-amber-600">${getCount('PKG')}</span></div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Finished Goods</span><span class="text-xl font-bold text-indigo-600">${getCount('FG')}</span></div>
+                </div>
+            `;
+
+            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
+            let filteredItems = window.localData.items;
+            if (searchTerm) {
+                filteredItems = filteredItems.filter(i => i.code.toLowerCase().includes(searchTerm) || i.name.toLowerCase().includes(searchTerm));
+            }
+            
+            const itemsPerPage = 50;
+            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
+            let currentPage = window.appState.itemMasterPage || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+            
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.printItemBarcode('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            
+            return `<div class="max-w-7xl mx-auto text-center">
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                            <div class="lg:col-span-1">${form}</div>
+                            <div class="lg:col-span-3">
+                                ${stats}
+                                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
+                                    <div class="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
+                                        <h3 class="font-bold text-slate-800 uppercase text-lg">รายการสินค้าทั้งหมด</h3>
+                                        <div class="relative w-full md:w-64">
+                                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            <input type="text" oninput="window.handleItemMasterSearch(this.value)" value="${window.appState.itemMasterSearch}" class="w-full border-slate-200 border pl-10 pr-3 py-2 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ค้นหารหัส หรือ ชื่อสินค้า...">
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 overflow-auto custom-scrollbar">
+                                        <table class="w-full text-sm text-left border-collapse">
+                                            <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold">
+                                                <tr><th style="width: 250px; min-width: 250px;" class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr>
+                                            </thead>
+                                            <tbody id="item-master-tbody">
+                                                ${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div id="item-master-pagination" class="px-6 py-3 border-t border-slate-100 bg-white flex justify-between items-center text-[12px]">
+                                        <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
+                                        <div class="flex items-center gap-2">
+                                            <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+                                            <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
+                                            <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+        }
 
         function renderInventoryStatus() {
             const currentFilter = window.appState.inventoryFilter, 
@@ -1374,10 +1281,7 @@
                 for(let lot of active) {
                     if (lot.expDate && lot.expDate !== '-') {
                         const expD = new Date(lot.expDate);
-                        if (expD <= sixMonthsLimit) {
-                            hasExpiringLot = true;
-                            break;
-                        }
+                        if (expD <= sixMonthsLimit) { hasExpiringLot = true; break; }
                     }
                 }
 
@@ -1388,10 +1292,7 @@
                     ag = active.sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate))
                         .map(lot => {
                             const d = Math.floor((new Date() - new Date(lot.receivedDate)) / 86400000);
-                            return `<div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border mb-1 mr-1 ${d <= 30 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}" title="Lot: ${lot.lotNo} | Qty: ${lot.qty}">
-                                <span class="font-bold">${d}</span>
-                                <span class="opacity-70 text-[8px]">ว.</span>
-                            </div>`;
+                            return `<div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border mb-1 mr-1 ${d <= 30 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}" title="Lot: ${lot.lotNo} | Qty: ${lot.qty}"><span class="font-bold">${d}</span><span class="opacity-70 text-[8px]">ว.</span></div>`;
                         }).join('');
                 }
 
@@ -1471,118 +1372,9 @@
                 </div>`;
         }
 
-        function renderItemMaster() {
-            const can = window.checkPerm('manage_item');
-            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
-            const getCount = (type) => window.localData.items.filter(i => i.type === type).length;
-            const form = can ? `
-                <div class="space-y-6 text-left">
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h3 class="font-bold mb-4 text-slate-800 flex items-center"><i class="fas fa-plus-circle text-primary mr-2"></i> เพิ่มสินค้าใหม่</h3>
-                        <form onsubmit="window.handleCreateItem(event)" class="space-y-4">
-                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">รหัสสินค้า</label><input name="code" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
-                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ชื่อสินค้า</label><input name="name" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" required></div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
-                                <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยหลัก</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
-                            </div>
-                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none" value="0"></div>
-                            <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all">บันทึกสินค้า</button>
-                        </form>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูลสินค้า</h3>
-                        <div class="mb-4 bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
-                            <p class="text-[11px] font-bold text-blue-600 mb-1 leading-tight"><i class="fas fa-info-circle mr-1"></i> รูปแบบคอลัมน์ใน Excel:</p>
-                            <ul class="text-[10px] text-blue-500 list-disc list-inside space-y-0.5">
-                                <li><b>รหัสสินค้า</b> (Code) - จำเป็น</li>
-                                <li><b>ชื่อสินค้า</b> (Name) - จำเป็น</li>
-                                <li><b>ประเภท</b> (Type) - RM, FG, PKG</li>
-                                <li><b>หน่วย</b> (Unit) - kg, pcs, set, g, ml</li>
-                                <li><b>Min Stock</b> - ตัวเลขจุดสั่งซื้อ</li>
-                            </ul>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="window.downloadItemTemplate()" type="button" class="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-sm">
-                                <i class="fas fa-download"></i> โหลดเทมเพลต
-                            </button>
-                            <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleExcelImport(event)">
-                            <button onclick="document.getElementById('excel-file-input').click()" type="button" class="flex-1 bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-sm">
-                                <i class="fas fa-file-excel"></i> เลือกไฟล์ Excel
-                            </button>
-                        </div>
-                    </div>
-                </div>` : ``;
-            const stats = `
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Raw Material</span><span class="text-xl font-bold text-emerald-600">${getCount('RM')}</span></div>
-                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Packaging</span><span class="text-xl font-bold text-amber-600">${getCount('PKG')}</span></div>
-                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center"><span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Finished Goods</span><span class="text-xl font-bold text-indigo-600">${getCount('FG')}</span></div>
-                </div>
-            `;
-
-            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
-            let filteredItems = window.localData.items;
-            if (searchTerm) {
-                filteredItems = filteredItems.filter(i => i.code.toLowerCase().includes(searchTerm) || i.name.toLowerCase().includes(searchTerm));
-            }
-            
-            const itemsPerPage = 50;
-            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
-            let currentPage = window.appState.itemMasterPage || 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-            
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
-
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
-            
-            return `<div class="max-w-7xl mx-auto text-center">
-                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                            <div class="lg:col-span-1">${form}</div>
-                            <div class="lg:col-span-3">
-                                ${stats}
-                                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
-                                    
-                                    <div class="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
-                                        <h3 class="font-bold text-slate-800 uppercase text-lg">รายการสินค้าทั้งหมด</h3>
-                                        <div class="relative w-full md:w-64">
-                                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                            <input type="text" oninput="window.handleItemMasterSearch(this.value)" value="${window.appState.itemMasterSearch}" class="w-full border-slate-200 border pl-10 pr-3 py-2 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ค้นหารหัส หรือ ชื่อสินค้า...">
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="flex-1 overflow-auto custom-scrollbar">
-                                        <table class="w-full text-sm text-left border-collapse">
-                                            <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-400 uppercase text-[11px] font-bold">
-                                                <tr><th style="width: 250px; min-width: 250px;" class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b text-center">หน่วย</th><th class="border-b text-center">จัดการ</th></tr>
-                                            </thead>
-                                            <tbody id="item-master-tbody">
-                                                ${list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>'}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div id="item-master-pagination" class="px-6 py-3 border-t border-slate-100 bg-white flex justify-between items-center text-[12px]">
-                                        <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
-                                        <div class="flex items-center gap-2">
-                                            <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
-                                            <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
-                                            <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>`;
-        }
-
         function renderReceiveForm() { 
             const filterDate = window.appState.receiveHistoryFilterDate || '';
             const allReceiveTrans = window.localData.transactions.filter(t => t.type === 'RECEIVE' && t.status !== 'VOIDED');
-            
             const filteredTrans = filterDate 
                 ? allReceiveTrans.filter(t => t.date.includes(new Date(filterDate).toLocaleDateString('th-TH').split(' ')[0]))
                 : allReceiveTrans.slice(0, 10); 
@@ -1673,11 +1465,6 @@
                 </div>
             </div>`; 
         }
-
-        window.switchQCTab = (tab) => {
-            window.appState.qcTab = tab;
-            window.renderView('qc-task');
-        };
 
         function renderQCTask() { 
             const currentTab = window.appState.qcTab || 'PENDING';
@@ -1937,6 +1724,103 @@
                 </div>
             </div>`;
         }
+    </script>
+
+    <!-- SCRIPT 4: FIREBASE INIT (MODULE) -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        let firebaseConfig;
+        try {
+            firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                apiKey: "AIzaSyAqOMC8fVaRMDB5aPpoImYSVFwjU1d_99k", authDomain: "onsetstock.firebaseapp.com", projectId: "onsetstock", storageBucket: "onsetstock.firebasestorage.app", messagingSenderId: "159241390751", appId: "1:159241390751:web:58bef364f4678621ac70aa"
+            });
+        } catch (e) { console.error("Config parsing error", e); }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : (typeof __app_id !== 'undefined' ? __app_id : 'factory-os-main'); 
+
+        window.auth = auth; window.db = db; window.appId = appId;
+        window.db_doc = doc; window.db_setDoc = setDoc; window.db_getDoc = getDoc; window.db_deleteDoc = deleteDoc;
+        window.db_addDoc = addDoc; window.db_collection = collection; window.db_updateDoc = updateDoc;
+
+        async function initApp() {
+            try {
+                let token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null);
+                if (token) {
+                    try { await signInWithCustomToken(auth, token); } 
+                    catch (tokenError) { console.warn("Fallback to anonymous:", tokenError); await signInAnonymously(auth); }
+                } else { await signInAnonymously(auth); }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        clearTimeout(window.fallbackTimeout);
+                        setupFirestoreListeners(user);
+                    } else {
+                        document.getElementById('loading-screen').classList.add('hidden');
+                        document.getElementById('login-view').classList.remove('hidden');
+                    }
+                });
+            } catch (e) { 
+                console.error("Firebase Auth Init Error:", e); 
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('login-view').classList.remove('hidden');
+                document.getElementById('login-error').innerText = "Auth Error: " + e.message;
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        function setupFirestoreListeners(user) {
+            if (!user) return;
+            const basePath = `artifacts/${appId}/public/data`;
+            
+            const handleError = (err) => {
+                console.error("Firestore Listen Error:", err);
+                document.getElementById('loading-screen').classList.add('hidden');
+                if(!window.appState.currentUser) {
+                    document.getElementById('login-view').classList.remove('hidden');
+                    document.getElementById('login-error').innerText = "Database Error: " + err.message;
+                    document.getElementById('login-error').classList.remove('hidden');
+                }
+            };
+
+            onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
+            onSnapshot(collection(db, basePath, 'stock'), (s) => { window.localData.stock = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
+            onSnapshot(collection(db, basePath, 'transactions'), (s) => { window.localData.transactions = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)); if(window.refreshView) window.refreshView(); }, handleError);
+            onSnapshot(collection(db, basePath, 'users'), async (s) => { 
+                window.localData.users = s.docs.map(d=>({id:d.id,...d.data()}));
+                const seeds = [{u:'admin',p:'1234',n:'System Admin',r:'ADMIN'},{u:'stock',p:'1234',n:'Stock Manager',r:'STOCK'},{u:'qc',p:'1234',n:'QC Inspector',r:'QC'}];
+                for (const u of seeds) { 
+                    if (!window.localData.users.find(x => x.username === u.u)) { 
+                        try { await addDoc(collection(db, basePath, 'users'), {username:u.u,password:u.p,name:u.n,role:u.r}); } catch(e){ console.warn("Seed users error", e); } 
+                    } 
+                }
+                try {
+                    const sessDoc = await getDoc(doc(db, `artifacts/${appId}/users/${user.uid}/session`, 'current'));
+                    if (sessDoc.exists()) {
+                        const data = sessDoc.data();
+                        const loggedUser = window.localData.users.find(u => u.username === data.username);
+                        if (loggedUser) {
+                            window.appState.currentUser = loggedUser;
+                            document.getElementById('login-view').classList.add('hidden');
+                            document.getElementById('app-layout').classList.remove('hidden');
+                            document.getElementById('app-layout').classList.remove('opacity-0');
+                            const hash = window.location.hash.substring(1);
+                            if(typeof window.renderView === 'function') window.renderView(hash || 'dashboard');
+                        }
+                    }
+                } catch(e) { console.error("Session sync error:", e); }
+                if(window.refreshView) window.refreshView(); 
+                document.getElementById('loading-screen').classList.add('hidden');
+                if(!window.appState.currentUser) document.getElementById('login-view').classList.remove('hidden');
+            }, handleError);
+        }
+
+        initApp();
     </script>
 </body>
 </html>
