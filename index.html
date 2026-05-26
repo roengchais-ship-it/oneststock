@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบบริหารจัดการสต็อก (Onest stock)</title>
     <!-- Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -773,74 +773,95 @@
             for (let i = 0; i < qty; i++) {
                 labelsHTML += `
                     <div class="label">
+                        <div class="sku">${item.code}</div>
                         <div class="name">${item.name}</div>
-                        <div class="type">${item.type}</div>
-                        <svg class="barcode-target"></svg>
+                        <svg class="barcode-target" data-code="${item.code}"></svg>
                         <div class="qc-box">
-                            <div class="qc-item"><div class="box"></div> <span style="color: #15803d;">PASS</span> (ผ่าน)</div>
-                            <div class="qc-item"><div class="box"></div> <span style="color: #b91c1c;">REJECT</span> (ไม่ผ่าน)</div>
+                            <div class="qc-item"><div class="box"></div> <span>PASS</span> (ผ่าน)</div>
+                            <div class="qc-item"><div class="box"></div> <span>REJECT</span> (ไม่ผ่าน)</div>
                         </div>
                     </div>
                 `;
             }
 
             const html = `
+                <!DOCTYPE html>
                 <html>
                 <head>
                     <title>Print Barcode - ${item.code}</title>
-                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap" rel="stylesheet">
                     <style>
-                        @page { size: A4; margin: 10mm; }
+                        /* ตั้งค่าหน้ากระดาษ A4 */
+                        @page { size: A4 portrait; margin: 10mm 5mm; }
                         body { 
                             font-family: 'Sarabun', sans-serif; 
                             margin: 0; 
                             padding: 0; 
                             display: flex; 
                             flex-wrap: wrap; 
-                            align-content: flex-start;
-                            gap: 5mm; 
+                            gap: 2mm; 
+                            justify-content: flex-start;
+                            color: #000; /* โทนสีดำทั้งหมดสำหรับการพิมพ์ขาวดำ */
                         }
                         .label {
-                            width: calc((100% - 10mm) / 3); /* 3 columns with 2 gaps of 5mm */
-                            height: 60mm;
-                            border: 1px dashed #ccc;
+                            width: 65mm; /* กว้าง 65mm ทำให้เรียงได้ 3 ดวงพอดีในความกว้างกระดาษ A4 (210mm) */
+                            height: 45mm;
+                            border: 1px dashed #000;
                             box-sizing: border-box;
-                            padding: 4mm;
+                            padding: 3mm;
                             display: flex;
                             flex-direction: column;
                             align-items: center;
-                            justify-content: center;
                             page-break-inside: avoid;
                         }
-                        .name { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-                        .type { font-size: 9px; margin-bottom: 4px; color: #555; border: 1px solid #ccc; padding: 1px 4px; border-radius: 4px; background: #eee;}
-                        svg { max-width: 100%; height: 22mm; margin-bottom: 4px; }
+                        .sku { 
+                            font-size: 22px; /* เน้น SKU ให้ใหญ่มาก */
+                            font-weight: 800; /* หนาพิเศษ */
+                            line-height: 1;
+                            margin-bottom: 2px;
+                            text-align: center;
+                        }
+                        .name { 
+                            font-size: 11px; 
+                            font-weight: 700; /* ชื่อสินค้ายังคงความหนาแต่ตัวเล็กกว่า SKU */
+                            text-align: center; 
+                            margin-bottom: 4px; 
+                            overflow: hidden; 
+                            text-overflow: ellipsis; 
+                            white-space: nowrap; 
+                            max-width: 100%; 
+                        }
+                        svg { 
+                            max-width: 100%; 
+                            height: 20mm; 
+                            margin-bottom: auto; 
+                        }
                         .qc-box { 
                             width: 100%; 
                             display: flex; 
                             justify-content: space-around; 
                             font-size: 11px; 
+                            font-weight: 800; /* ทำให้ส่วน QC หนาพิเศษ */
+                            border-top: 2px solid #000; /* เส้นคั่นหนาขึ้น */
+                            padding-top: 4px; 
                             margin-top: auto; 
-                            border-top: 1px dashed #aaa; 
-                            padding-top: 6px; 
-                            font-weight: bold;
                         }
                         .qc-item { display: flex; align-items: center; gap: 4px; }
-                        .box { width: 12px; height: 12px; border: 1.5px solid #333; border-radius: 2px; }
+                        .box { width: 12px; height: 12px; border: 2px solid #000; border-radius: 2px; }
                     </style>
                     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
                 </head>
                 <body>
                     ${labelsHTML}
                     <script>
-                        JsBarcode(".barcode-target", "${item.code}", { 
-                            format: "CODE128", 
-                            width: 1.5, 
-                            height: 35, 
-                            displayValue: true, 
-                            fontSize: 12, 
-                            margin: 0,
-                            textMargin: 2
+                        document.querySelectorAll('.barcode-target').forEach(el => {
+                            JsBarcode(el, el.getAttribute('data-code'), {
+                                format: "CODE128",
+                                width: 1.5,
+                                height: 40,
+                                displayValue: false, /* ปิดตัวอักษรใต้บาร์โค้ดเพราะเน้น SKU ข้างบนแล้ว */
+                                margin: 0
+                            });
                         });
                         window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); };
                     <\/script>
