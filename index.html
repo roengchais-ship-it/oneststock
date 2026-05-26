@@ -779,17 +779,17 @@
                         <div class="sku">${item.code}</div>
                         <div class="name">${item.name}</div>
                         <svg class="barcode-target" data-code="${item.code}"></svg>
-                        <div class="qc-box">
-                            <div class="qc-item"><div class="box"></div> <span>PASS</span> (ผ่าน)</div>
-                            <div class="qc-item"><div class="box"></div> <span>REJECT</span> (ไม่ผ่าน)</div>
-                        </div>
-                        <div class="qc-sign-area">
-                            <div>หมายเหตุ: .......................................</div>
-                            <div>ลงชื่อ QC: ............................</div>
-                        </div>
+                    <div class="qc-box">
+                        <div class="qc-item"><div class="box"></div> <span>PASS</span> (ผ่าน)</div>
+                        <div class="qc-item"><div class="box"></div> <span>REJECT</span> (ไม่ผ่าน)</div>
                     </div>
-                `;
-            }
+                    <div class="qc-sign-area">
+                        <div>ลงชื่อ QC: ............................</div>
+                        <div>หมายเหตุ: .......................................</div>
+                    </div>
+                </div>
+            `;
+        }
 
             const html = `
                 <!DOCTYPE html>
