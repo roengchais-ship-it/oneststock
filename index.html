@@ -1240,6 +1240,12 @@
             else if(viewId==='user-list') content.innerHTML=renderUserList();
         };
 
+        window.refreshView = () => {
+            if(window.appState && window.appState.currentView) {
+                window.renderView(window.appState.currentView);
+            }
+        };
+
         function card(t,v,i,tc,ic){return `<div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dashboard-card flex flex-col items-center"><div><p class="text-slate-400 text-xs font-bold uppercase mb-2 text-center w-full">${t}</p><h3 class="text-3xl font-bold ${tc} text-center">${v.toLocaleString()}</h3></div><div class="mt-3 p-3 rounded-xl ${ic}"><i class="fas ${i} text-xl"></i></div></div>`;}
 
         function renderDashboard() {
