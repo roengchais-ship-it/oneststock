@@ -370,6 +370,31 @@
         </div>
     </div>
 
+    <!-- Print Barcode Modal -->
+    <div id="print-barcode-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-80 overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white"><i class="fas fa-print mr-2"></i> พิมพ์บาร์โค้ด</h3>
+                <button onclick="window.closeModal('print-barcode-modal')" class="text-indigo-100 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="print-barcode-id">
+                <div class="text-center mb-2">
+                    <h4 id="print-barcode-code" class="font-mono font-bold text-indigo-600 text-lg"></h4>
+                    <p id="print-barcode-name" class="text-sm text-slate-600 truncate"></p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">จำนวนดวงที่ต้องการพิมพ์</label>
+                    <input type="number" id="print-barcode-qty" class="w-full border-2 border-slate-200 rounded-xl px-3 py-3 text-center text-2xl font-bold text-slate-700 focus:border-indigo-400 outline-none" min="1" value="1">
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button onclick="window.closeModal('print-barcode-modal')" class="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold">ยกเลิก</button>
+                    <button onclick="window.executePrintBarcode()" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-lg">พิมพ์</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT 1: GLOBAL STATE, CORE LOGIC, AND RENDERERS -->
     <script>
         // ==========================================
@@ -722,29 +747,101 @@
             lotSelect.innerHTML = opts;
         };
 
-        window.printItemBarcode = function(id) {
+        window.openPrintBarcodeModal = function(id) {
             const item = window.localData.items.find(x => String(x.id) === String(id));
             if (!item) return;
+            document.getElementById('print-barcode-id').value = id;
+            document.getElementById('print-barcode-code').innerText = item.code;
+            document.getElementById('print-barcode-name').innerText = item.name;
+            document.getElementById('print-barcode-qty').value = 1;
+            document.getElementById('print-barcode-modal').classList.remove('hidden');
+        };
+
+        window.executePrintBarcode = function() {
+            const id = document.getElementById('print-barcode-id').value;
+            const qty = parseInt(document.getElementById('print-barcode-qty').value) || 1;
+            if (qty < 1) return window.alertError("จำนวนต้องมากกว่า 0");
+            
+            window.closeModal('print-barcode-modal');
+            
+            const item = window.localData.items.find(x => String(x.id) === String(id));
+            if (!item) return;
+            
             const printWin = window.open('', '_blank');
+            
+            let labelsHTML = '';
+            for (let i = 0; i < qty; i++) {
+                labelsHTML += `
+                    <div class="label">
+                        <div class="name">${item.name}</div>
+                        <div class="type">${item.type}</div>
+                        <svg class="barcode-target"></svg>
+                        <div class="qc-box">
+                            <div class="qc-item"><div class="box"></div> <span style="color: #15803d;">PASS</span> (ผ่าน)</div>
+                            <div class="qc-item"><div class="box"></div> <span style="color: #b91c1c;">REJECT</span> (ไม่ผ่าน)</div>
+                        </div>
+                    </div>
+                `;
+            }
+
             const html = `
                 <html>
                 <head>
                     <title>Print Barcode - ${item.code}</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
                     <style>
-                        @page { margin: 0; size: 50mm 30mm; } 
-                        body { margin: 0; padding: 2mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Sarabun', sans-serif; height: 100vh; box-sizing: border-box; }
-                        .name { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-                        .type { font-size: 9px; padding: 1px 3px; border-radius: 3px; margin-bottom: 2px; }
-                        svg { max-width: 100%; max-height: 20mm; }
+                        @page { size: A4; margin: 10mm; }
+                        body { 
+                            font-family: 'Sarabun', sans-serif; 
+                            margin: 0; 
+                            padding: 0; 
+                            display: flex; 
+                            flex-wrap: wrap; 
+                            align-content: flex-start;
+                            gap: 5mm; 
+                        }
+                        .label {
+                            width: calc((100% - 10mm) / 3); /* 3 columns with 2 gaps of 5mm */
+                            height: 60mm;
+                            border: 1px dashed #ccc;
+                            box-sizing: border-box;
+                            padding: 4mm;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            page-break-inside: avoid;
+                        }
+                        .name { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+                        .type { font-size: 9px; margin-bottom: 4px; color: #555; border: 1px solid #ccc; padding: 1px 4px; border-radius: 4px; background: #eee;}
+                        svg { max-width: 100%; height: 22mm; margin-bottom: 4px; }
+                        .qc-box { 
+                            width: 100%; 
+                            display: flex; 
+                            justify-content: space-around; 
+                            font-size: 11px; 
+                            margin-top: auto; 
+                            border-top: 1px dashed #aaa; 
+                            padding-top: 6px; 
+                            font-weight: bold;
+                        }
+                        .qc-item { display: flex; align-items: center; gap: 4px; }
+                        .box { width: 12px; height: 12px; border: 1.5px solid #333; border-radius: 2px; }
                     </style>
                     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
                 </head>
                 <body>
-                    <div class="name">${item.name}</div>
-                    <div class="type">${item.type}</div>
-                    <svg id="barcode"></svg>
+                    ${labelsHTML}
                     <script>
-                        JsBarcode("#barcode", "${item.code}", { format: "CODE128", width: 1.5, height: 40, displayValue: true, fontSize: 12, margin: 0 });
+                        JsBarcode(".barcode-target", "${item.code}", { 
+                            format: "CODE128", 
+                            width: 1.5, 
+                            height: 35, 
+                            displayValue: true, 
+                            fontSize: 12, 
+                            margin: 0,
+                            textMargin: 2
+                        });
                         window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); };
                     <\/script>
                 </body>
@@ -1132,7 +1229,7 @@
             const startIndex = (currentPage - 1) * itemsPerPage;
             const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
 
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.printItemBarcode('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openPrintBarcodeModal('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
             
             const tbody = document.getElementById('item-master-tbody');
             if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
@@ -1214,7 +1311,7 @@
             const startIndex = (currentPage - 1) * itemsPerPage;
             const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
 
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.printItemBarcode('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
+            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openPrintBarcodeModal('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
             
             return `<div class="max-w-7xl mx-auto text-center">
                         <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
