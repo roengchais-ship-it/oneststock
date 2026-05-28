@@ -247,11 +247,11 @@
         </div>
     </div>
 
-    <!-- Edit Lot Modal -->
+    <!-- Edit Lot Modal (ปรับปรุงเพิ่ม Status และ Qty) -->
     <div id="edit-lot-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-white"><i class="fas fa-calendar-check mr-2"></i> แก้ไขข้อมูล Lot</h3>
+                <h3 class="text-lg font-bold text-white"><i class="fas fa-calendar-check mr-2"></i> แก้ไขข้อมูล / ปรับสต็อก Lot</h3>
                 <button onclick="window.closeModal('edit-lot-modal')" class="text-emerald-100 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4 text-left">
@@ -267,6 +267,23 @@
                         <input type="date" id="edit-lot-exp" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700">
                     </div>
                 </div>
+                <!-- ส่วนที่เพิ่มใหม่: ให้แก้จำนวนและสถานะได้ -->
+                <div class="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">จำนวนคงเหลือ (ปรับปรุง)</label>
+                        <input type="number" id="edit-lot-qty" class="w-full border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-emerald-700 font-bold" step="0.001">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">สถานะ (Status)</label>
+                        <select id="edit-lot-status" class="w-full border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-emerald-700 font-bold">
+                            <option value="AVAILABLE">พร้อมใช้ (AVAILABLE)</option>
+                            <option value="WAIT_QC">รอตรวจ (WAIT_QC)</option>
+                            <option value="HOLD">กักกัน (HOLD)</option>
+                            <option value="REJECT">ไม่ผ่าน (REJECT)</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Location (โซนจัดเก็บ)</label>
                     <input type="text" id="edit-lot-loc" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="เช่น โซน Organic - A1">
@@ -287,13 +304,13 @@
                 </div>
                 <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                     <button onclick="window.closeModal('edit-lot-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold flex-1">ยกเลิก</button>
-                    <button onclick="window.saveEditLot()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-lg transform active:scale-95 transition-all flex-1">บันทึก</button>
+                    <button onclick="window.saveEditLot()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-lg transform active:scale-95 transition-all flex-1">บันทึกการแก้ไข</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Item Detail Modal -->
+    <!-- Item Detail Modal (ปรับปรุงเพิ่มกล่อง Reject) -->
     <div id="item-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-white/20 max-h-[95vh] flex flex-col">
             <div class="bg-gradient-to-r from-indigo-600 to-primary px-6 py-4 flex justify-between items-center shrink-0">
@@ -301,8 +318,8 @@
                 <button onclick="window.closeModal('item-detail-modal')" class="text-indigo-200 hover:text-white transition-colors"><i class="fas fa-times text-xl"></i></button>
             </div>
             <div class="p-4 md:p-6 overflow-y-auto bg-slate-50 flex-1">
-                <!-- Summary Stats -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <!-- Summary Stats (เพิ่ม Reject) -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
                     <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
                         <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">ยอดรวมทั้งหมด</span>
                         <span class="text-lg md:text-xl font-bold text-slate-800" id="detail-tot">0</span>
@@ -315,9 +332,13 @@
                         <span class="text-[10px] text-amber-500 font-bold uppercase mb-1">รอตรวจสอบ (QC)</span>
                         <span class="text-lg md:text-xl font-bold text-amber-600" id="detail-qc">0</span>
                     </div>
+                    <div class="bg-white p-4 rounded-xl border border-orange-100 shadow-sm flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] text-orange-500 font-bold uppercase mb-1">กักกัน (Hold)</span>
+                        <span class="text-lg md:text-xl font-bold text-orange-600" id="detail-hold">0</span>
+                    </div>
                     <div class="bg-white p-4 rounded-xl border border-red-100 shadow-sm flex flex-col items-center justify-center text-center">
-                        <span class="text-[10px] text-red-500 font-bold uppercase mb-1">กักกัน (Hold)</span>
-                        <span class="text-lg md:text-xl font-bold text-red-600" id="detail-hold">0</span>
+                        <span class="text-[10px] text-red-500 font-bold uppercase mb-1">ไม่ผ่าน (Reject)</span>
+                        <span class="text-lg md:text-xl font-bold text-red-600" id="detail-reject">0</span>
                     </div>
                 </div>
                 
@@ -464,37 +485,25 @@
         window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
 
         // ==========================================
-        // AUTO-RECOVERY (กู้คืนสต็อกกำพร้าที่ข้อมูลสินค้าหลักหายไป)
+        // AUTO-RECOVERY
         // ==========================================
         window.runAutoRecovery = async () => {
             if (!window.db_setDoc || !window.appId || !window.localData.items.length) return;
-            
-            // ค้นหาสต็อกที่มีจำนวน > 0 แต่ไม่มีรหัสอ้างอิงใน Item Master
             const orphanedStocks = window.localData.stock.filter(s => s.qty > 0 && !window.localData.items.find(i => String(i.id) === String(s.itemId)));
-            
             if (orphanedStocks.length > 0) {
                 console.log(`[Auto-Recovery] Found ${orphanedStocks.length} orphaned stock records. Initiating recovery...`);
                 let recoveredCount = 0;
-                
                 for (const s of orphanedStocks) {
-                    // หาข้อมูลจากใบประวัติ (transactions) ที่เคยบันทึกไว้
                     const trans = window.localData.transactions.find(t => String(t.itemId) === String(s.itemId));
                     const code = trans && trans.item ? trans.item.split(' - ')[0].trim() : `REC-${s.itemId.substring(0,4)}`;
                     const name = trans && trans.item ? trans.item.split(' - ').slice(1).join(' - ').trim() : 'ข้อมูลถูกกู้คืนอัตโนมัติ';
-                    
                     try {
                         const existingItem = window.localData.items.find(i => i.code === code);
                         if (existingItem) {
-                            // ถ้าผู้ใช้สร้าง Item Code เดิมขึ้นมาใหม่แล้ว ให้โยงกลับไปที่ ID ใหม่นั้น
                             await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, s.id), { itemId: existingItem.id });
                         } else {
-                            // ถ้ายังไม่มี ให้สร้าง Item Master กลับคืนมาด้วย ID เดิม
                             await window.db_setDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, s.itemId), {
-                                code: code,
-                                name: name + ' (กู้คืน)',
-                                type: 'RM',
-                                unit: s.unit || 'pcs',
-                                minStock: 0
+                                code: code, name: name + ' (กู้คืน)', type: 'RM', unit: s.unit || 'pcs', minStock: 0
                             });
                         }
                         recoveredCount++;
@@ -578,9 +587,6 @@
         };
 
         window.deleteItem = async (id) => { 
-            // -----------------------------------------------------
-            // ป้องกันการลบ Item Master หากยังมีสต็อกเหลืออยู่
-            // -----------------------------------------------------
             const relatedStock = window.localData.stock.filter(s => String(s.itemId) === String(id) && s.qty > 0);
             if (relatedStock.length > 0) {
                 const totalQty = relatedStock.reduce((a,b)=>a+b.qty, 0);
@@ -636,6 +642,7 @@
             } catch(e){window.alertError(e.message)} 
         };
 
+        // Edit Lot - มีการเพิ่ม Qty & Status
         window.openEditLotModal = function(stockId, itemId) {
             const stock = window.localData.stock.find(x => String(x.id) === String(stockId));
             if(!stock) return;
@@ -644,6 +651,13 @@
             document.getElementById('edit-lot-no').value = stock.lotNo || '';
             document.getElementById('edit-lot-exp').value = (stock.expDate && stock.expDate !== '-') ? stock.expDate : '';
             document.getElementById('edit-lot-loc').value = stock.location || '';
+            
+            // เพิ่มใหม่
+            const qtyEl = document.getElementById('edit-lot-qty');
+            if(qtyEl) qtyEl.value = stock.qty;
+            
+            const statusEl = document.getElementById('edit-lot-status');
+            if(statusEl) statusEl.value = stock.status || 'WAIT_QC';
             
             document.getElementById('edit-lot-container').value = stock.container || '';
             document.getElementById('edit-lot-temperature').value = stock.temperature || '';
@@ -657,25 +671,49 @@
             const itemId = document.getElementById('edit-lot-item-id').value;
             const newExp = document.getElementById('edit-lot-exp').value || '-';
             const newLoc = document.getElementById('edit-lot-loc').value || '';
-            
             const newContainer = document.getElementById('edit-lot-container').value || '-';
             const newTemp = document.getElementById('edit-lot-temperature').value || '-';
             const newPrecautions = document.getElementById('edit-lot-precautions').value || '-';
+            
+            // อ่านค่าที่เพิ่มใหม่
+            const qtyEl = document.getElementById('edit-lot-qty');
+            const newQty = qtyEl ? parseFloat(qtyEl.value) : null;
+            const statusEl = document.getElementById('edit-lot-status');
+            const newStatus = statusEl ? statusEl.value : null;
 
             try {
+                const stock = window.localData.stock.find(x => String(x.id) === String(stockId));
+                if(!stock) throw new Error("ไม่พบข้อมูล Stock");
+                
+                let diff = 0;
+                let updatePayload = { 
+                    expDate: newExp, location: newLoc, container: newContainer, temperature: newTemp, precautions: newPrecautions 
+                };
+
+                if (newStatus && newStatus !== stock.status) {
+                    updatePayload.status = newStatus;
+                }
+                
+                if (newQty !== null && !isNaN(newQty) && newQty !== stock.qty) {
+                    diff = newQty - stock.qty;
+                    updatePayload.qty = newQty;
+                }
+
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
-                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { 
-                        expDate: newExp, location: newLoc, container: newContainer, temperature: newTemp, precautions: newPrecautions 
-                    });
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), updatePayload);
                 }
                 else { 
-                    const stock = window.localData.stock.find(x => x.id === stockId); 
-                    if (stock) { 
-                        stock.expDate = newExp; stock.location = newLoc;
-                        stock.container = newContainer; stock.temperature = newTemp; stock.precautions = newPrecautions;
-                    } 
+                    Object.assign(stock, updatePayload);
                 }
-                window.closeModal('edit-lot-modal'); window.alertSuccess('อัปเดตข้อมูล Lot สำเร็จ'); window.openItemDetailModal(itemId); 
+                
+                // หากมีการแก้ตัวเลข ให้บันทึก Transaction อัตโนมัติ ป้องกันข้อมูลไม่ตรง
+                if (diff !== 0) {
+                    await window.logTrans('ADJUST', itemId, stock.lotNo, diff, stock.unit, `ปรับยอดแมนนวล (จาก ${stock.qty} เป็น ${newQty})`, null, stockId);
+                }
+                
+                window.closeModal('edit-lot-modal'); 
+                window.alertSuccess('อัปเดตข้อมูลและปรับปรุงสต็อกสำเร็จ'); 
+                window.openItemDetailModal(itemId); 
             } catch(e) { window.alertError(e.message); }
         };
 
@@ -720,25 +758,14 @@
             const factor = window.getConversionFactor(d.unit, item.unit);
             const convertedQty = parseFloat(d.qty) * factor; 
 
-            // Override Location, Container, Temp to default staging values
             const finalLocation = 'รอระบุ (Staging)';
             const finalContainer = '-';
             const finalTemp = '-';
 
             const stockPayload = { 
-                itemId: d.itemId, 
-                lotNo: d.lotNo, 
-                qty: convertedQty, 
-                unit: item.unit, 
-                status: 'WAIT_QC', 
-                expDate: d.expDate, 
-                location: finalLocation, 
-                container: finalContainer,
-                temperature: finalTemp,
-                precautions: d.precautions || '-',
-                firstOpenedDate: '-',
-                receivedDate: t, 
-                timestamp: Date.now() 
+                itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, 
+                location: finalLocation, container: finalContainer, temperature: finalTemp, precautions: d.precautions || '-',
+                firstOpenedDate: '-', receivedDate: t, timestamp: Date.now() 
             };
 
             try { 
@@ -1118,20 +1145,28 @@
             const av = stock.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty, 0);
             const qc = stock.filter(x=>x.status==='WAIT_QC' || x.status==='HOLD').reduce((a,b)=>a+b.qty, 0);
             const hold = stock.filter(x=>x.status==='HOLD').reduce((a,b)=>a+b.qty, 0);
+            // เพิ่มการรวม Reject
+            const reject = stock.filter(x=>x.status==='REJECT').reduce((a,b)=>a+b.qty, 0);
 
             document.getElementById('detail-modal-title').innerHTML = `<span class="bg-white/20 px-2 py-0.5 rounded text-sm font-mono mr-2">${item.code||''}</span> ${item.name||''}`;
             document.getElementById('detail-tot').innerText = tot.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' ' + (item.unit||'');
             document.getElementById('detail-av').innerText = av.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' ' + (item.unit||'');
             document.getElementById('detail-qc').innerText = qc.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' ' + (item.unit||'');
             document.getElementById('detail-hold').innerText = hold.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' ' + (item.unit||'');
+            
+            const rejectEl = document.getElementById('detail-reject');
+            if(rejectEl) rejectEl.innerText = reject.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' ' + (item.unit||'');
 
             const canManage = window.checkPerm('manage_item');
 
             const lotRows = stock.length > 0 
                 ? stock.sort((a,b) => new Date(a.receivedDate) - new Date(b.receivedDate)).map(s => {
+                    // อัปเดต Badge ให้รองรับ Reject
                     let stBadge = s.status === 'AVAILABLE' ? '<span class="text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold rounded">พร้อมใช้</span>' :
                                   s.status === 'WAIT_QC' ? '<span class="text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold rounded">รอ QC</span>' :
-                                  '<span class="text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold rounded">HOLD</span>';
+                                  s.status === 'HOLD' ? '<span class="text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 text-[10px] font-bold rounded">HOLD</span>' :
+                                  s.status === 'REJECT' ? '<span class="text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold rounded">ไม่ผ่าน (REJECT)</span>' :
+                                  `<span class="text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 text-[10px] font-bold rounded">${s.status||'-'}</span>`;
                     
                     const firstOpenBtn = `<button onclick="window.markFirstOpen('${s.id}', '${itemId}')" class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded text-[9px] hover:bg-indigo-100 transition-all font-bold whitespace-nowrap"><i class="fas fa-lock-open mr-1"></i>🔓 เปิดใช้</button>`;
                     const openedDateDisplay = s.firstOpenedDate && s.firstOpenedDate !== '-' ? `<span class="text-[10px] font-bold text-slate-600 whitespace-nowrap">${s.firstOpenedDate}</span>` : firstOpenBtn;
@@ -1481,7 +1516,8 @@
             });
             const activeTrans = window.localData.transactions.filter(t => t.status !== 'VOIDED');
             const recentTrans = activeTrans.slice(0, 5);
-            const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
+            // เพิ่ม ADJUST ลงใน typeMap
+            const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน', 'ADJUST': 'ปรับสต็อก' };
             return `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 text-center">
                     ${card('สินค้าทั้งหมด',total,'fa-boxes','text-slate-800','bg-indigo-50 text-indigo-600')}
@@ -1510,7 +1546,7 @@
                             const itemSplit = (t.item||'').split(' - '), code = itemSplit[0] || '-', name = itemSplit.slice(1).join(' - ') || '-';
                             const typeStr = t.type || '';
                             const displayType = typeMap[typeStr] || typeStr;
-                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${(t.date||'').split(' ')[1] || '-'}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${typeStr.includes('REC')?'bg-emerald-100 text-emerald-700':typeStr.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${(t.qty||0).toFixed(2)}</td><td class="px-6 py-4 text-slate-900 font-bold uppercase text-[10px]">${t.unit || '-'}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy||'-'}</td></tr>` }).join('')}
+                        return `<tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-center text-xs font-medium"><td class="px-6 py-4 text-slate-400 font-mono">${(t.date||'').split(' ')[1] || '-'}</td><td class="px-6 py-4 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${typeStr.includes('REC')?'bg-emerald-100 text-emerald-700':typeStr.includes('ISS')?'bg-indigo-100 text-indigo-700':typeStr==='ADJUST'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}">${displayType}</span></td><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${code}</td><td class="px-6 py-4 text-slate-700 text-left">${name}</td><td class="px-6 py-4 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'}">${t.qty > 0 ? '+' : ''}${(t.qty||0).toFixed(2)}</td><td class="px-6 py-4 text-slate-900 font-bold uppercase text-[10px]">${t.unit || '-'}</td><td class="px-6 py-4 text-slate-500 text-center">${t.actionBy||'-'}</td></tr>` }).join('')}
                         ${recentTrans.length === 0 ? '<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 italic font-medium">ยังไม่มีข้อมูลรายการเคลื่อนไหว</td></tr>' : ''}
                         </tbody></table></div>
                     </div>
@@ -2014,7 +2050,8 @@
         
         function renderHistory() { 
             const isAdmin = window.appState.currentUser.role === 'ADMIN';
-            const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' }; 
+            // อัปเดต typeMap ให้รองรับ ADJUST
+            const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน', 'ADJUST': 'ปรับปรุงสต็อก' }; 
             const currentFilter = window.appState.historyFilter || 'ALL';
 
             let filteredTrans = window.localData.transactions;
@@ -2071,7 +2108,7 @@
                 return `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-xs font-medium ${isVoided ? 'voided-row bg-slate-50' : ''}">
                     <td class="p-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">${t.date||'-'}</td>
                     <td class="p-3 text-center">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${isVoided ? 'bg-slate-200 text-slate-400' : (typeStr.includes('REC')?'bg-emerald-100 text-emerald-700':typeStr.includes('ISS')?'bg-indigo-100 text-indigo-700':'bg-amber-100 text-amber-700')}">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${isVoided ? 'bg-slate-200 text-slate-400' : (typeStr.includes('REC')?'bg-emerald-100 text-emerald-700':typeStr.includes('ISS')?'bg-indigo-100 text-indigo-700':typeStr==='ADJUST'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700')}">
                             ${isVoided ? 'ยกเลิกแล้ว' : (typeMap[typeStr]||typeStr)}
                         </span>
                     </td>
