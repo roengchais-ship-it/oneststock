@@ -464,6 +464,49 @@
         window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
 
         // ==========================================
+        // AUTO-RECOVERY (กู้คืนสต็อกกำพร้าที่ข้อมูลสินค้าหลักหายไป)
+        // ==========================================
+        window.runAutoRecovery = async () => {
+            if (!window.db_setDoc || !window.appId || !window.localData.items.length) return;
+            
+            // ค้นหาสต็อกที่มีจำนวน > 0 แต่ไม่มีรหัสอ้างอิงใน Item Master
+            const orphanedStocks = window.localData.stock.filter(s => s.qty > 0 && !window.localData.items.find(i => String(i.id) === String(s.itemId)));
+            
+            if (orphanedStocks.length > 0) {
+                console.log(`[Auto-Recovery] Found ${orphanedStocks.length} orphaned stock records. Initiating recovery...`);
+                let recoveredCount = 0;
+                
+                for (const s of orphanedStocks) {
+                    // หาข้อมูลจากใบประวัติ (transactions) ที่เคยบันทึกไว้
+                    const trans = window.localData.transactions.find(t => String(t.itemId) === String(s.itemId));
+                    const code = trans && trans.item ? trans.item.split(' - ')[0].trim() : `REC-${s.itemId.substring(0,4)}`;
+                    const name = trans && trans.item ? trans.item.split(' - ').slice(1).join(' - ').trim() : 'ข้อมูลถูกกู้คืนอัตโนมัติ';
+                    
+                    try {
+                        const existingItem = window.localData.items.find(i => i.code === code);
+                        if (existingItem) {
+                            // ถ้าผู้ใช้สร้าง Item Code เดิมขึ้นมาใหม่แล้ว ให้โยงกลับไปที่ ID ใหม่นั้น
+                            await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, s.id), { itemId: existingItem.id });
+                        } else {
+                            // ถ้ายังไม่มี ให้สร้าง Item Master กลับคืนมาด้วย ID เดิม
+                            await window.db_setDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, s.itemId), {
+                                code: code,
+                                name: name + ' (กู้คืน)',
+                                type: 'RM',
+                                unit: s.unit || 'pcs',
+                                minStock: 0
+                            });
+                        }
+                        recoveredCount++;
+                    } catch (e) { console.error("Recovery error for item:", s.itemId, e); }
+                }
+                if(recoveredCount > 0) {
+                    window.alertSuccess(`ระบบได้ตรวจพบข้อมูลสินค้าที่สูญหายและทำการกู้คืนให้เรียบร้อยแล้วจำนวน ${recoveredCount} รายการ โปรดรีเฟรชหน้าจอหรือดูที่ข้อมูลสินค้า`);
+                }
+            }
+        };
+
+        // ==========================================
         // 3. DATABASE ACTION HANDLERS
         // ==========================================
         window.handleLogin = async function(e) {
@@ -535,11 +578,20 @@
         };
 
         window.deleteItem = async (id) => { 
-            if(!confirm('ยืนยันลบสินค้านี้?')) return;
+            // -----------------------------------------------------
+            // ป้องกันการลบ Item Master หากยังมีสต็อกเหลืออยู่
+            // -----------------------------------------------------
+            const relatedStock = window.localData.stock.filter(s => String(s.itemId) === String(id) && s.qty > 0);
+            if (relatedStock.length > 0) {
+                const totalQty = relatedStock.reduce((a,b)=>a+b.qty, 0);
+                return window.alertError(`ไม่สามารถลบข้อมูลสินค้านี้ได้ เนื่องจากยังมีสต็อกคงเหลืออยู่ในระบบจำนวน ${totalQty.toLocaleString()} รายการ (เพื่อป้องกันข้อมูลสูญหาย)`);
+            }
+
+            if(!confirm('ยืนยันลบข้อมูลสินค้านี้ถาวร?')) return;
             try { 
                 if(window.db_deleteDoc && window.db_doc && window.db && window.appId) await window.db_deleteDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id)); 
                 else window.localData.items = window.localData.items.filter(x => x.id !== id);
-                window.alertSuccess('ลบแล้ว'); window.renderView('item-master');
+                window.alertSuccess('ลบข้อมูลสินค้าเรียบร้อยแล้ว'); window.renderView('item-master');
             } catch(e){window.alertError(e.message)} 
         };
         
@@ -1197,7 +1249,6 @@
         };
 
         window.downloadReceiveTemplate = () => {
-            // Updated columns: removed Location, Container, Temp
             const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "ข้อควรระวังในการจัดเก็บ"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "-"]]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -1423,7 +1474,6 @@
                 if(s.qty>0){ 
                     const it=window.localData.items.find(x=>String(x.id) === String(s.itemId)); 
                     if(it){ 
-                        // เพิ่ม s.status==='HOLD' เพื่อให้นับรวมยอดรอตรวจสอบด้วย
                         if(s.status==='WAIT_QC' || s.status==='HOLD')qc++; 
                         if(s.status==='AVAILABLE')avail++; 
                     } 
@@ -1578,7 +1628,6 @@
                 const s = window.localData.stock.filter(x=>String(x.itemId) === String(i.id)), 
                       tot=s.reduce((a,b)=>a+(b.qty||0),0), 
                       av=s.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+(b.qty||0),0), 
-                      // ให้ยอดรอ QC นับรวมรายการที่ติด HOLD ด้วย
                       qc=s.filter(x=>x.status==='WAIT_QC' || x.status==='HOLD').reduce((a,b)=>a+(b.qty||0),0);
                 
                 const isLow = tot <= (i.minStock || 0) && (i.minStock || 0) > 0;
@@ -1790,7 +1839,6 @@
             `;
 
             if (currentTab === 'PENDING') {
-                // ดึงข้อมูลสินค้าที่สถานะเป็น WAIT_QC หรือ HOLD
                 const t = window.localData.stock.filter(s => (s.status === 'WAIT_QC' || s.status === 'HOLD') && s.qty > 0); 
                 if (!t.length) return tabsHTML + `<div class="text-center py-20 flex flex-col items-center gap-4 text-slate-400 italic font-medium"><i class="fas fa-check-circle text-5xl text-emerald-200"></i> ปัจจุบันไม่มีรายการงานรอตรวจสอบคุณภาพ หรือติด Hold</div>`; 
                 const cards = t.map(s => { 
@@ -2132,7 +2180,16 @@
             };
 
             onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
-            onSnapshot(collection(db, basePath, 'stock'), (s) => { window.localData.stock = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
+            onSnapshot(collection(db, basePath, 'stock'), (s) => { 
+                window.localData.stock = s.docs.map(d=>({id:d.id,...d.data()})); 
+                if(window.refreshView) window.refreshView(); 
+                
+                // ตรวจสอบข้อมูลสูญหายอัตโนมัติ (Delay เพื่อให้ข้อมูลอื่นๆ โหลดครบก่อน)
+                setTimeout(() => {
+                    if (window.runAutoRecovery) window.runAutoRecovery();
+                }, 2500);
+
+            }, handleError);
             onSnapshot(collection(db, basePath, 'transactions'), (s) => { window.localData.transactions = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)); if(window.refreshView) window.refreshView(); }, handleError);
             onSnapshot(collection(db, basePath, 'users'), async (s) => { 
                 window.localData.users = s.docs.map(d=>({id:d.id,...d.data()}));
