@@ -247,9 +247,9 @@
         </div>
     </div>
 
-    <!-- Edit Lot Modal -->
+    <!-- Edit Lot Modal (Updated with Template Fields) -->
     <div id="edit-lot-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/20">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4 flex justify-between items-center">
                 <h3 class="text-lg font-bold text-white"><i class="fas fa-calendar-check mr-2"></i> แก้ไขข้อมูล Lot</h3>
                 <button onclick="window.closeModal('edit-lot-modal')" class="text-emerald-100 hover:text-white"><i class="fas fa-times"></i></button>
@@ -257,17 +257,33 @@
             <div class="p-6 space-y-4 text-left">
                 <input type="hidden" id="edit-lot-id">
                 <input type="hidden" id="edit-lot-item-id">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lot No.</label>
-                    <input type="text" id="edit-lot-no" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 cursor-not-allowed font-mono text-slate-500" readonly>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lot No.</label>
+                        <input type="text" id="edit-lot-no" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 cursor-not-allowed font-mono text-slate-500" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">วันหมดอายุ</label>
+                        <input type="date" id="edit-lot-exp" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">วันหมดอายุ (Exp Date)</label>
-                    <input type="date" id="edit-lot-exp" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Location (โซนจัดเก็บ)</label>
+                    <input type="text" id="edit-lot-loc" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="เช่น โซน Organic - A1">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ภาชนะจัดเก็บ</label>
+                        <input type="text" id="edit-lot-container" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="เช่น ถังพลาสติก">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">อุณหภูมิจัดเก็บ</label>
+                        <input type="text" id="edit-lot-temperature" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="เช่น 2-8 °C">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Location</label>
-                    <input type="text" id="edit-lot-loc" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="ตำแหน่งจัดเก็บ">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ข้อควรระวัง</label>
+                    <input type="text" id="edit-lot-precautions" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-700" placeholder="เช่น ระวังความชื้น">
                 </div>
                 <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                     <button onclick="window.closeModal('edit-lot-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-bold flex-1">ยกเลิก</button>
@@ -279,7 +295,7 @@
 
     <!-- Item Detail Modal -->
     <div id="item-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-white/20 max-h-[95vh] flex flex-col">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-white/20 max-h-[95vh] flex flex-col">
             <div class="bg-gradient-to-r from-indigo-600 to-primary px-6 py-4 flex justify-between items-center shrink-0">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2" id="detail-modal-title"><i class="fas fa-list-ul"></i> รายละเอียดสินค้า</h3>
                 <button onclick="window.closeModal('item-detail-modal')" class="text-indigo-200 hover:text-white transition-colors"><i class="fas fa-times text-xl"></i></button>
@@ -307,22 +323,25 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <!-- Lot Details Table -->
-                    <div class="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                        <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-cubes text-indigo-500 mr-2"></i> รายละเอียดแต่ละ Lot</div>
-                        <div class="overflow-x-auto max-h-[300px] custom-scrollbar">
-                            <table class="w-full text-sm text-left border-collapse min-w-[500px]">
+                    <div class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                        <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-cubes text-indigo-500 mr-2"></i> รายละเอียดแต่ละ Lot (ข้อมูลตามเทมเพลตคลัง)</div>
+                        <div class="overflow-x-auto max-h-[350px] custom-scrollbar">
+                            <table class="w-full text-sm text-left border-collapse min-w-[900px]">
                                 <thead class="bg-slate-50 sticky top-0 shadow-sm text-[10px] text-slate-500 uppercase text-center">
-                                    <tr><th class="py-2 px-4 border-b">Lot No.</th><th class="py-2 px-4 border-b text-right">จำนวน</th><th class="py-2 px-4 border-b">สถานะ</th><th class="py-2 px-4 border-b">Location</th><th class="py-2 px-4 border-b">หมดอายุ</th><th class="py-2 px-4 border-b">อายุ(วัน)</th><th class="py-2 px-4 border-b text-center">จัดการ</th></tr>
+                                    <tr>
+                                        <th class="py-2 px-3 border-b">Lot No.</th>
+                                        <th class="py-2 px-3 border-b text-right">จำนวน</th>
+                                        <th class="py-2 px-3 border-b">สถานะ</th>
+                                        <th class="py-2 px-3 border-b">โซนจัดเก็บ</th>
+                                        <th class="py-2 px-3 border-b">ภาชนะ/อุณหภูมิ</th>
+                                        <th class="py-2 px-3 border-b">เปิดใช้ครั้งแรก</th>
+                                        <th class="py-2 px-3 border-b">หมดอายุ</th>
+                                        <th class="py-2 px-3 border-b text-center">จัดการ</th>
+                                    </tr>
                                 </thead>
                                 <tbody id="detail-lot-tbody">
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-                    <!-- Recent Transactions -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                        <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-history text-primary mr-2"></i> ประวัติล่าสุด (5 รายการ)</div>
-                        <div class="p-4 space-y-2 overflow-y-auto max-h-[300px] custom-scrollbar" id="detail-trans-list">
                         </div>
                     </div>
                 </div>
@@ -573,6 +592,12 @@
             document.getElementById('edit-lot-no').value = stock.lotNo || '';
             document.getElementById('edit-lot-exp').value = (stock.expDate && stock.expDate !== '-') ? stock.expDate : '';
             document.getElementById('edit-lot-loc').value = stock.location || '';
+            
+            // New Template Fields
+            document.getElementById('edit-lot-container').value = stock.container || '';
+            document.getElementById('edit-lot-temperature').value = stock.temperature || '';
+            document.getElementById('edit-lot-precautions').value = stock.precautions || '';
+
             document.getElementById('edit-lot-modal').classList.remove('hidden');
         };
 
@@ -581,10 +606,46 @@
             const itemId = document.getElementById('edit-lot-item-id').value;
             const newExp = document.getElementById('edit-lot-exp').value || '-';
             const newLoc = document.getElementById('edit-lot-loc').value || '';
+            
+            // New Template Fields
+            const newContainer = document.getElementById('edit-lot-container').value || '-';
+            const newTemp = document.getElementById('edit-lot-temperature').value || '-';
+            const newPrecautions = document.getElementById('edit-lot-precautions').value || '-';
+
             try {
-                if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { expDate: newExp, location: newLoc });
-                else { const stock = window.localData.stock.find(x => x.id === stockId); if (stock) { stock.expDate = newExp; stock.location = newLoc; } }
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { 
+                        expDate: newExp, location: newLoc, container: newContainer, temperature: newTemp, precautions: newPrecautions 
+                    });
+                }
+                else { 
+                    const stock = window.localData.stock.find(x => x.id === stockId); 
+                    if (stock) { 
+                        stock.expDate = newExp; stock.location = newLoc;
+                        stock.container = newContainer; stock.temperature = newTemp; stock.precautions = newPrecautions;
+                    } 
+                }
                 window.closeModal('edit-lot-modal'); window.alertSuccess('อัปเดตข้อมูล Lot สำเร็จ'); window.openItemDetailModal(itemId); 
+            } catch(e) { window.alertError(e.message); }
+        };
+
+        // NEW: Mark First Opened Date
+        window.markFirstOpen = async (stockId, itemId) => {
+            if(!confirm('ยืนยันการเปิดใช้งาน Lot นี้ครั้งแรกใช่หรือไม่?\nระบบจะทำการบันทึกเวลาปัจจุบันเป็นวันที่เปิดใช้งาน')) return;
+            
+            const now = new Date();
+            // Format to DD/MM/YYYY HH:mm
+            const dateStr = now.toLocaleDateString('th-TH') + ' ' + now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+            
+            try {
+                if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { firstOpenedDate: dateStr });
+                } else {
+                    const s = window.localData.stock.find(x => x.id === stockId);
+                    if(s) s.firstOpenedDate = dateStr;
+                }
+                window.alertSuccess('บันทึกเวลาเปิดใช้งานสำเร็จ');
+                window.openItemDetailModal(itemId); // Refresh modal data
             } catch(e) { window.alertError(e.message); }
         };
 
@@ -605,16 +666,37 @@
         };
 
         window.receiveItem = async (d) => { 
-            const t=new Date().toISOString().split('T')[0], item = window.localData.items.find(x => String(x.id) === String(d.itemId)); 
+            const t = new Date().toISOString().split('T')[0];
+            const item = window.localData.items.find(x => String(x.id) === String(d.itemId)); 
             if(!item) return window.alertError("ไม่พบข้อมูลสินค้า"); 
-            const factor = window.getConversionFactor(d.unit, item.unit), convertedQty = parseFloat(d.qty) * factor; 
+            const factor = window.getConversionFactor(d.unit, item.unit);
+            const convertedQty = parseFloat(d.qty) * factor; 
+
+            // Create stock document including Template Fields
+            const stockPayload = { 
+                itemId: d.itemId, 
+                lotNo: d.lotNo, 
+                qty: convertedQty, 
+                unit: item.unit, 
+                status: 'WAIT_QC', 
+                expDate: d.expDate, 
+                location: d.location, 
+                container: d.container || '-',
+                temperature: d.temperature || '-',
+                precautions: d.precautions || '-',
+                firstOpenedDate: '-',
+                receivedDate: t, 
+                timestamp: Date.now() 
+            };
+
             try { 
                 if(window.db_addDoc && window.db_collection && window.db && window.appId) {
-                    const stockRef = await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/stock`), { itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() }); 
+                    const stockRef = await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/stock`), stockPayload); 
                     await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
                 } else {
                     const newId = Date.now().toString();
-                    window.localData.stock.push({ id: newId, itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, location: d.location, receivedDate: t, timestamp: Date.now() });
+                    stockPayload.id = newId;
+                    window.localData.stock.push(stockPayload);
                     await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, newId);
                 }
                 return true;
@@ -824,9 +906,6 @@
             document.getElementById('print-barcode-modal').classList.remove('hidden');
         };
 
-        // ===============================================
-        // --- PRINT BARCODE: ปรับความสูงเพื่อให้ได้ 3 ดวง ---
-        // ===============================================
         window.executePrintBarcode = function() {
             const id = document.getElementById('print-barcode-id').value;
             const qty = parseInt(document.getElementById('print-barcode-qty').value) || 1;
@@ -865,19 +944,18 @@
                     <title>Print Barcode - ${item.code||''}</title>
                     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
                     <style>
-                        /* ตั้งค่าหน้ากระดาษ ขนาด 100mm x 150mm margin 0 ป้องกันการปัดตกขอบ */
                         @page { size: 100mm 150mm; margin: 0mm; }
                         body { 
                             font-family: 'Sarabun', sans-serif; 
                             margin: 0; 
-                            padding: 2mm; /* ให้ระยะขอบของหน้าอยู่ที่ body แทน */
+                            padding: 2mm; 
                             color: #000; 
                             box-sizing: border-box;
                         }
                         .label {
                             width: 96mm; 
-                            height: 46mm; /* ลดความสูงลงจาก 48 เป็น 46 เพื่อให้ 3 ดวงรวมกันไม่เกิน 150mm */
-                            border: 1px dashed #eee; /* ให้สีจางลงกว่าเดิม จะได้ไม่กวนสายตาตอนปรินต์ */
+                            height: 46mm; 
+                            border: 1px dashed #eee; 
                             box-sizing: border-box;
                             padding: 2mm 3mm;
                             display: flex;
@@ -888,7 +966,7 @@
                             margin: 0 auto 2mm auto; 
                         }
                         .sku { 
-                            font-size: 22px; /* ลดฟอนต์ลงนิดนึงจะได้ไม่เบียด */
+                            font-size: 22px; 
                             font-weight: 800;
                             line-height: 1;
                             margin-bottom: 2px;
@@ -906,7 +984,7 @@
                         }
                         svg { 
                             max-width: 100%; 
-                            height: 14mm; /* ลดความสูงของบาร์โค้ดลงนิดนึง */
+                            height: 14mm; 
                             margin-bottom: auto; 
                         }
                         .qc-box { 
@@ -941,7 +1019,7 @@
                             JsBarcode(el, el.getAttribute('data-code'), {
                                 format: "CODE128",
                                 width: 2,
-                                height: 40, /* ลดความสูงของแท่งบาร์โค้ดลงจาก 50 เป็น 40 */
+                                height: 40,
                                 displayValue: false,
                                 margin: 0
                             });
@@ -960,7 +1038,6 @@
             if(!item) return;
 
             const stock = window.localData.stock.filter(x => String(x.itemId) === String(itemId) && x.qty > 0);
-            const trans = window.localData.transactions.filter(t => String(t.itemId) === String(itemId) && t.status !== 'VOIDED').slice(0, 5);
 
             const tot = stock.reduce((a,b)=>a+b.qty, 0);
             const av = stock.filter(x=>x.status==='AVAILABLE').reduce((a,b)=>a+b.qty, 0);
@@ -977,54 +1054,30 @@
 
             const lotRows = stock.length > 0 
                 ? stock.sort((a,b) => new Date(a.receivedDate) - new Date(b.receivedDate)).map(s => {
-                    const age = Math.floor((new Date() - new Date(s.receivedDate)) / 86400000) || 0;
                     let stBadge = s.status === 'AVAILABLE' ? '<span class="text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold rounded">พร้อมใช้</span>' :
                                   s.status === 'WAIT_QC' ? '<span class="text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold rounded">รอ QC</span>' :
                                   '<span class="text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold rounded">HOLD</span>';
+                    
+                    const firstOpenBtn = `<button onclick="window.markFirstOpen('${s.id}', '${itemId}')" class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded text-[9px] hover:bg-indigo-100 transition-all font-bold whitespace-nowrap"><i class="fas fa-lock-open mr-1"></i>🔓 เปิดใช้</button>`;
+                    const openedDateDisplay = s.firstOpenedDate && s.firstOpenedDate !== '-' ? `<span class="text-[10px] font-bold text-slate-600 whitespace-nowrap">${s.firstOpenedDate}</span>` : firstOpenBtn;
+
                     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors text-sm">
-                                <td class="py-2.5 px-4 font-mono font-bold text-indigo-600 text-center">${s.lotNo||'-'}</td>
-                                <td class="py-2.5 px-4 text-right font-bold text-slate-800">${s.qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
-                                <td class="py-2.5 px-4 text-center">${stBadge}</td>
-                                <td class="py-2.5 px-4 text-center text-slate-600">${s.location || '-'}</td>
-                                <td class="py-2.5 px-4 text-center text-slate-600">${s.expDate || '-'}</td>
-                                <td class="py-2.5 px-4 text-center font-bold ${age > 30 ? 'text-red-500' : 'text-slate-500'}">${age}</td>
-                                <td class="py-2.5 px-4 text-center">
+                                <td class="py-2.5 px-3 font-mono font-bold text-indigo-600">${s.lotNo||'-'}</td>
+                                <td class="py-2.5 px-3 text-right font-bold text-slate-800">${s.qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+                                <td class="py-2.5 px-3">${stBadge}</td>
+                                <td class="py-2.5 px-3 text-[10px] text-slate-600">${s.location || '-'}</td>
+                                <td class="py-2.5 px-3 text-[10px] text-slate-500 leading-tight">${s.container||'-'}<br><span class="text-amber-600">${s.temperature||'-'}</span></td>
+                                <td class="py-2.5 px-3 text-center">${openedDateDisplay}</td>
+                                <td class="py-2.5 px-3 text-[10px] text-slate-600">${s.expDate || '-'}</td>
+                                <td class="py-2.5 px-3 text-center">
                                     <button onclick="window.openEditLotModal('${s.id}', '${itemId}')" class="${canManage ? 'text-slate-400 hover:text-emerald-600' : 'text-slate-200 cursor-not-allowed'} p-1 transition-colors" ${!canManage ? 'disabled' : ''} title="แก้ไขข้อมูล Lot">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                 </td>
                             </tr>`;
                 }).join('') 
-                : '<tr><td colspan="7" class="text-center py-8 text-slate-400 italic">ไม่มีสต็อกคงเหลือในระบบ</td></tr>';
+                : '<tr><td colspan="8" class="text-center py-8 text-slate-400 italic">ไม่มีสต็อกคงเหลือในระบบ</td></tr>';
             document.getElementById('detail-lot-tbody').innerHTML = lotRows;
-
-            const typeMap = { 'RECEIVE': 'รับเข้า', 'ISSUE': 'เบิกจ่าย', 'QC_PASS': 'QC ผ่าน', 'QC_HOLD': 'กักกัน', 'QC_FAIL': 'QC ไม่ผ่าน' };
-            const transRows = trans.length > 0 
-                ? trans.map(t => {
-                    const typeStr = t.type || '';
-                    const isRec = typeStr.includes('REC');
-                    const isIss = typeStr.includes('ISS');
-                    const icon = isRec ? '<i class="fas fa-arrow-down text-emerald-500"></i>' : isIss ? '<i class="fas fa-arrow-up text-indigo-500"></i>' : '<i class="fas fa-sync text-amber-500"></i>';
-                    const sign = t.qty > 0 ? '+' : '';
-                    const color = t.qty > 0 ? 'text-emerald-600' : t.qty < 0 ? 'text-red-600' : 'text-slate-500';
-                    const dateParts = (t.date || '').split(' ');
-                    const dateOnly = dateParts[0] || '-';
-                    return `<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">${icon}</div>
-                                    <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-slate-700">${typeMap[t.type] || t.type}</span>
-                                        <span class="text-[10px] text-slate-400 font-mono">${dateOnly}</span>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="block text-sm font-bold ${color}">${sign}${t.qty.toLocaleString(undefined, {maximumFractionDigits:2})}</span>
-                                    <span class="text-[9px] text-slate-400 bg-slate-100 px-1 rounded">${t.lot||'-'}</span>
-                                </div>
-                            </div>`;
-                }).join('') 
-                : '<div class="text-center py-8 text-slate-400 text-xs italic">ไม่มีประวัติล่าสุด</div>';
-            document.getElementById('detail-trans-list').innerHTML = transRows;
 
             document.getElementById('item-detail-modal').classList.remove('hidden');
         };
@@ -1121,7 +1174,7 @@
         };
 
         window.downloadReceiveTemplate = () => {
-            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "Location"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "MAIN-A1"]]);
+            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "Location"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "Organic - A1"]]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template");
             XLSX.writeFile(wb, "Receive_Template.xlsx");
@@ -1144,7 +1197,6 @@
             
             const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             
-            // เพิ่มคอลัมน์ หมายเหตุ และช่องเซ็นชื่อผู้ตรวจสอบ QC ลงในแบบฟอร์มตรวจสอบสต็อก
             const html = `
                 <div style="font-family: 'Sarabun', sans-serif; padding: 10px; font-size: 12px;">
                     <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px;">
@@ -1288,10 +1340,16 @@
                         const unit = (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase();
                         const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
                         const location = (row["Location"] || row["Loc"] || "MAIN").toString().trim();
+                        
+                        // New fields fallback
+                        const container = (row["ภาชนะในการจัดเก็บ"] || row["Container"] || "-").toString().trim();
+                        const temperature = (row["อุณหภูมิจัดเก็บ"] || row["Temp"] || "-").toString().trim();
+                        const precautions = (row["ข้อควรระวังในการจัดเก็บ"] || row["Precautions"] || "-").toString().trim();
+
                         const item = window.localData.items.find(i => (i.code||'').toUpperCase() === code);
                         
                         if (item && qty > 0) {
-                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, location: location });
+                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, location: location, container: container, temperature: temperature, precautions: precautions });
                             successCount++;
                         } else { errorCount++; }
                     }
@@ -1380,40 +1438,6 @@
                 </div>`;
         }
 
-        window.updateItemMasterTable = function() {
-            const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
-            const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
-            let filteredItems = window.localData.items;
-            if (searchTerm) {
-                filteredItems = filteredItems.filter(i => (i.code||'').toLowerCase().includes(searchTerm) || (i.name||'').toLowerCase().includes(searchTerm));
-            }
-            
-            const itemsPerPage = 50;
-            const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
-            let currentPage = window.appState.itemMasterPage || 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-            
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const currentItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
-
-            const list = currentItems.map(i => `<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm"><td style="width: 250px; min-width: 250px;" class="py-3 px-6 font-bold text-primary text-left font-mono break-all">${i.code||'-'}</td><td class="py-3 px-6 text-left font-medium text-slate-700 break-words">${i.name||'-'}</td><td><span class="${typeClasses[i.type] || 'bg-slate-100'} px-2 py-0.5 rounded-full font-bold text-[10px]">${i.type||'-'}</span></td><td class="text-slate-500 uppercase font-bold text-[10px] text-center">${i.unit||'-'}</td><td class="text-center"><div class="flex justify-center gap-1"><button onclick="window.openPrintBarcodeModal('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-2 rounded-full transition-all" title="พิมพ์สติ๊กเกอร์บาร์โค้ด"><i class="fas fa-barcode"></i></button><button onclick="window.openEditItemModal('${i.id}')" class="text-slate-300 hover:text-blue-500 p-2 rounded-full transition-all"><i class="fas fa-edit"></i></button><button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-all"><i class="fas fa-trash-alt"></i></button></div></td></tr>`).join('');
-            
-            const tbody = document.getElementById('item-master-tbody');
-            if (tbody) tbody.innerHTML = list.length ? list : '<tr><td colspan="5" class="py-20 text-center text-slate-300 italic font-medium">ไม่พบข้อมูลสินค้า</td></tr>';
-
-            const pagination = document.getElementById('item-master-pagination');
-            if (pagination) {
-                pagination.innerHTML = `
-                    <span class="text-slate-500 font-medium">แสดง ${filteredItems.length > 0 ? startIndex + 1 : 0} ถึง ${Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก ${filteredItems.length} รายการ</span>
-                    <div class="flex items-center gap-2">
-                        <button onclick="window.changeItemMasterPage(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
-                        <span class="font-bold text-slate-700 px-2">หน้า ${currentPage} / ${totalPages}</span>
-                        <button onclick="window.changeItemMasterPage(1)" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-                    </div>`;
-            }
-        };
-
         function renderItemMaster() {
             const can = window.checkPerm('manage_item');
             const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
@@ -1435,17 +1459,7 @@
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h3 class="font-bold mb-3 text-slate-800 flex items-center text-sm"><i class="fas fa-file-import text-emerald-500 mr-2"></i> นำเข้าข้อมูลสินค้า</h3>
-                        <div class="mb-4 bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
-                            <p class="text-[11px] font-bold text-blue-600 mb-1 leading-tight"><i class="fas fa-info-circle mr-1"></i> รูปแบบคอลัมน์ใน Excel:</p>
-                            <ul class="text-[10px] text-blue-500 list-disc list-inside space-y-0.5">
-                                <li><b>รหัสสินค้า</b> (Code) - จำเป็น</li>
-                                <li><b>ชื่อสินค้า</b> (Name) - จำเป็น</li>
-                                <li><b>ประเภท</b> (Type) - RM, FG, PKG</li>
-                                <li><b>หน่วย</b> (Unit) - kg, pcs, set, g, ml</li>
-                                <li><b>Min Stock</b> - ตัวเลขจุดสั่งซื้อ</li>
-                            </ul>
-                        </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 mt-4">
                             <button onclick="window.downloadItemTemplate()" type="button" class="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-sm">
                                 <i class="fas fa-download"></i> โหลดเทมเพลต
                             </button>
@@ -1640,6 +1654,7 @@
                 </div>`;
         }
 
+        // --- RENDER RECEIVE FORM (Updated for Template Fields) ---
         function renderReceiveForm() { 
             const filterDate = window.appState.receiveHistoryFilterDate || '';
             const allReceiveTrans = window.localData.transactions.filter(t => t.type === 'RECEIVE' && t.status !== 'VOIDED');
@@ -1675,42 +1690,48 @@
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4 gap-4">
                             <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-dolly text-primary mr-2"></i> รับของเข้า (GR)</h3>
                             <div class="flex gap-2">
-                                <button onclick="window.downloadReceiveTemplate()" type="button" class="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 transition-all text-sm" title="ดาวน์โหลดไฟล์ Excel แม่แบบ">
+                                <button onclick="window.downloadReceiveTemplate()" type="button" class="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 transition-all text-sm">
                                     <i class="fas fa-download"></i> <span class="hidden sm:inline">เทมเพลต</span>
                                 </button>
                                 <input type="file" id="receive-excel-input" class="hidden" accept=".xlsx, .xls" onchange="window.handleReceiveExcelImport(event)">
-                                <button onclick="document.getElementById('receive-excel-input').click()" type="button" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm" title="นำเข้าข้อมูลสต็อกจาก Excel">
+                                <button onclick="document.getElementById('receive-excel-input').click()" type="button" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all text-sm">
                                     <i class="fas fa-file-excel"></i> <span class="hidden sm:inline">นำเข้าสต็อก</span>
                                 </button>
                             </div>
                         </div>
 
-                        <div class="mb-6 bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-left">
-                            <p class="text-xs font-bold text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i> รายละเอียดคอลัมน์ Excel สำหรับนำเข้าสต็อก:</p>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-4">
-                                <div class="text-[10px] text-slate-600"><b>รหัสสินค้า</b> (Code): รหัสที่ตรงกับฐานข้อมูล</div>
-                                <div class="text-[10px] text-slate-600"><b>Lot No</b>: เลขล็อตสินค้า</div>
-                                <div class="text-[10px] text-slate-600"><b>จำนวน</b> (Qty): ตัวเลขจำนวนที่รับเข้า</div>
-                                <div class="text-[10px] text-slate-600"><b>หน่วย</b> (Unit): kg, pcs, set, g, ml</div>
-                                <div class="text-[10px] text-slate-600"><b>วันหมดอายุ</b> (Exp): YYYY-MM-DD</div>
-                                <div class="text-[10px] text-slate-600"><b>Location</b>: ตำแหน่งจัดเก็บ</div>
-                            </div>
-                            <p class="text-[9px] text-indigo-400 mt-2 italic font-medium">* ข้อมูลจะถูกบันทึกด้วยสถานะ "รอตรวจ QC" (WAIT_QC) โดยอัตโนมัติ</p>
-                        </div>
-
                         <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
                             <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 <div><label class="text-xs font-bold text-slate-500">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
                                 <div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div><label class="text-xs font-bold text-slate-500">วันหมดอายุ</label><input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl" required></div>
-                                <div><label class="text-xs font-bold text-slate-500">Location</label><input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
                                 <div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
                             </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-bold text-slate-500">โซนจัดเก็บ / Location</label>
+                                    <input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น โซน Organic - A1" required>
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-slate-500">ภาชนะในการจัดเก็บ</label>
+                                    <input name="container" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ถังพลาสติก" required>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-bold text-slate-500">อุณหภูมิจัดเก็บ</label>
+                                    <input name="temperature" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น 2-8 °C หรือ อุณหภูมิห้อง" required>
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-slate-500">วันหมดอายุ (Exp Date)</label>
+                                    <input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500">ข้อควรระวังในการจัดเก็บ</label>
+                                <input name="precautions" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ระวังความชื้น, เก็บให้พ้นแสงแดด">
+                            </div>
+                            
                             <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button>
                         </form>
                     </div>
