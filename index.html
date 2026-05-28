@@ -247,7 +247,7 @@
         </div>
     </div>
 
-    <!-- Edit Lot Modal (Updated with Template Fields) -->
+    <!-- Edit Lot Modal -->
     <div id="edit-lot-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4 flex justify-between items-center">
@@ -324,7 +324,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <!-- Lot Details Table -->
                     <div class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                        <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-cubes text-indigo-500 mr-2"></i> รายละเอียดแต่ละ Lot (ข้อมูลตามเทมเพลตคลัง)</div>
+                        <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-cubes text-indigo-500 mr-2"></i> รายละเอียดแต่ละ Lot</div>
                         <div class="overflow-x-auto max-h-[350px] custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse min-w-[900px]">
                                 <thead class="bg-slate-50 sticky top-0 shadow-sm text-[10px] text-slate-500 uppercase text-center">
@@ -593,7 +593,6 @@
             document.getElementById('edit-lot-exp').value = (stock.expDate && stock.expDate !== '-') ? stock.expDate : '';
             document.getElementById('edit-lot-loc').value = stock.location || '';
             
-            // New Template Fields
             document.getElementById('edit-lot-container').value = stock.container || '';
             document.getElementById('edit-lot-temperature').value = stock.temperature || '';
             document.getElementById('edit-lot-precautions').value = stock.precautions || '';
@@ -607,7 +606,6 @@
             const newExp = document.getElementById('edit-lot-exp').value || '-';
             const newLoc = document.getElementById('edit-lot-loc').value || '';
             
-            // New Template Fields
             const newContainer = document.getElementById('edit-lot-container').value || '-';
             const newTemp = document.getElementById('edit-lot-temperature').value || '-';
             const newPrecautions = document.getElementById('edit-lot-precautions').value || '-';
@@ -629,12 +627,10 @@
             } catch(e) { window.alertError(e.message); }
         };
 
-        // NEW: Mark First Opened Date
         window.markFirstOpen = async (stockId, itemId) => {
             if(!confirm('ยืนยันการเปิดใช้งาน Lot นี้ครั้งแรกใช่หรือไม่?\nระบบจะทำการบันทึกเวลาปัจจุบันเป็นวันที่เปิดใช้งาน')) return;
             
             const now = new Date();
-            // Format to DD/MM/YYYY HH:mm
             const dateStr = now.toLocaleDateString('th-TH') + ' ' + now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
             
             try {
@@ -645,7 +641,7 @@
                     if(s) s.firstOpenedDate = dateStr;
                 }
                 window.alertSuccess('บันทึกเวลาเปิดใช้งานสำเร็จ');
-                window.openItemDetailModal(itemId); // Refresh modal data
+                window.openItemDetailModal(itemId);
             } catch(e) { window.alertError(e.message); }
         };
 
@@ -660,7 +656,7 @@
                 await window.receiveItem(data);
                 form.reset();
                 window.clearSelection('receive-item');
-                window.alertSuccess('บันทึกการรับสินค้าสำเร็จ');
+                window.alertSuccess('บันทึกการรับสินค้าเข้าสู่สถานะรอระบุ (Staging) และรอตรวจ QC สำเร็จ');
                 window.refreshView();
             } catch(err) { window.alertError(err.message); }
         };
@@ -672,7 +668,11 @@
             const factor = window.getConversionFactor(d.unit, item.unit);
             const convertedQty = parseFloat(d.qty) * factor; 
 
-            // Create stock document including Template Fields
+            // Override Location, Container, Temp to default staging values
+            const finalLocation = 'รอระบุ (Staging)';
+            const finalContainer = '-';
+            const finalTemp = '-';
+
             const stockPayload = { 
                 itemId: d.itemId, 
                 lotNo: d.lotNo, 
@@ -680,9 +680,9 @@
                 unit: item.unit, 
                 status: 'WAIT_QC', 
                 expDate: d.expDate, 
-                location: d.location, 
-                container: d.container || '-',
-                temperature: d.temperature || '-',
+                location: finalLocation, 
+                container: finalContainer,
+                temperature: finalTemp,
                 precautions: d.precautions || '-',
                 firstOpenedDate: '-',
                 receivedDate: t, 
@@ -692,12 +692,12 @@
             try { 
                 if(window.db_addDoc && window.db_collection && window.db && window.appId) {
                     const stockRef = await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/stock`), stockPayload); 
-                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
+                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `(Input: ${d.qty} ${d.unit})`, null, stockRef.id); 
                 } else {
                     const newId = Date.now().toString();
                     stockPayload.id = newId;
                     window.localData.stock.push(stockPayload);
-                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `Loc: ${d.location} (Input: ${d.qty} ${d.unit})`, null, newId);
+                    await window.logTrans('RECEIVE', d.itemId, d.lotNo, convertedQty, item.unit, `(Input: ${d.qty} ${d.unit})`, null, newId);
                 }
                 return true;
             } catch(e){ throw e; } 
@@ -723,17 +723,40 @@
             if(!s) return; 
             const sampleInput = document.getElementById('qc-sample-' + id);
             const remarkInput = document.getElementById('qc-remark-' + id);
+            const locInput = document.getElementById('qc-loc-' + id);
+            const containerInput = document.getElementById('qc-container-' + id);
+            const tempInput = document.getElementById('qc-temp-' + id);
+
             const sampleQty = parseFloat(sampleInput.value) || 0;
             const remarkText = remarkInput.value.trim() || '-';
+            
+            const newLoc = locInput ? locInput.value.trim() : '';
+            const newContainer = containerInput ? containerInput.value.trim() : '';
+            const newTemp = tempInput ? tempInput.value.trim() : '';
+
             if (sampleQty < 0 || sampleQty > s.qty) return window.alertError('จำนวนที่นำไปทดสอบไม่ถูกต้อง (ต้องไม่ติดลบและไม่เกินจำนวนรอตรวจ)');
+            
+            if (act === 'PASS') {
+                if (!newLoc || !newContainer || !newTemp) {
+                    return window.alertError('กรุณาระบุ โซนจัดเก็บ, ภาชนะ และอุณหภูมิ ให้ครบถ้วนก่อนบันทึก PASS');
+                }
+            }
+
             let st = act === 'PASS' ? 'AVAILABLE' : (act === 'HOLD' ? 'HOLD' : 'REJECT'); 
             try { 
+                let updateData = { status: st };
+                if (act === 'PASS' || newLoc) updateData.location = newLoc || s.location;
+                if (act === 'PASS' || newContainer) updateData.container = newContainer || s.container;
+                if (act === 'PASS' || newTemp) updateData.temperature = newTemp || s.temperature;
+
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
-                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, id), { status: st }); 
-                } else { s.status = st; }
+                    await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, id), updateData); 
+                } else { 
+                    Object.assign(s, updateData);
+                }
                 const noteMsg = `สถานะ: ${st} | หยิบตัวอย่างทดสอบ: ${sampleQty} ${s.unit} | หมายเหตุ: ${remarkText}`;
                 await window.logTrans('QC_'+act, s.itemId, s.lotNo, 0, s.unit, noteMsg, null, id); 
-                window.alertSuccess('บันทึกผล QC เรียบร้อย (จำนวนสินค้าในระบบยังคงเท่าเดิม)'); window.renderView('qc-task');
+                window.alertSuccess('บันทึกผล QC เรียบร้อย'); window.renderView('qc-task');
             } catch(e){ window.alertError(e.message) } 
         };
 
@@ -1174,7 +1197,8 @@
         };
 
         window.downloadReceiveTemplate = () => {
-            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "Location"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "Organic - A1"]]);
+            // Updated columns: removed Location, Container, Temp
+            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "ข้อควรระวังในการจัดเก็บ"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "-"]]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template");
             XLSX.writeFile(wb, "Receive_Template.xlsx");
@@ -1339,17 +1363,13 @@
                         const qty = parseFloat(row["จำนวน"] || row["Qty"] || 0);
                         const unit = (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase();
                         const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
-                        const location = (row["Location"] || row["Loc"] || "MAIN").toString().trim();
                         
-                        // New fields fallback
-                        const container = (row["ภาชนะในการจัดเก็บ"] || row["Container"] || "-").toString().trim();
-                        const temperature = (row["อุณหภูมิจัดเก็บ"] || row["Temp"] || "-").toString().trim();
                         const precautions = (row["ข้อควรระวังในการจัดเก็บ"] || row["Precautions"] || "-").toString().trim();
 
                         const item = window.localData.items.find(i => (i.code||'').toUpperCase() === code);
                         
                         if (item && qty > 0) {
-                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, location: location, container: container, temperature: temperature, precautions: precautions });
+                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, precautions: precautions });
                             successCount++;
                         } else { errorCount++; }
                     }
@@ -1654,7 +1674,6 @@
                 </div>`;
         }
 
-        // --- RENDER RECEIVE FORM (Updated for Template Fields) ---
         function renderReceiveForm() { 
             const filterDate = window.appState.receiveHistoryFilterDate || '';
             const allReceiveTrans = window.localData.transactions.filter(t => t.type === 'RECEIVE' && t.status !== 'VOIDED');
@@ -1707,32 +1726,19 @@
                                 <div><label class="text-xs font-bold text-slate-500">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
                                 <div><label class="text-xs font-bold text-slate-500">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
                             </div>
+                            
                             <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-xs font-bold text-slate-500">โซนจัดเก็บ / Location</label>
-                                    <input name="location" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น โซน Organic - A1" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-bold text-slate-500">ภาชนะในการจัดเก็บ</label>
-                                    <input name="container" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ถังพลาสติก" required>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-xs font-bold text-slate-500">อุณหภูมิจัดเก็บ</label>
-                                    <input name="temperature" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น 2-8 °C หรือ อุณหภูมิห้อง" required>
-                                </div>
                                 <div>
                                     <label class="text-xs font-bold text-slate-500">วันหมดอายุ (Exp Date)</label>
                                     <input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required>
                                 </div>
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-slate-500">ข้อควรระวังในการจัดเก็บ</label>
-                                <input name="precautions" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ระวังความชื้น, เก็บให้พ้นแสงแดด">
+                                <div>
+                                    <label class="text-xs font-bold text-slate-500">ข้อควรระวังในการจัดเก็บ</label>
+                                    <input name="precautions" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ระวังความชื้น, เก็บให้พ้นแสงแดด">
+                                </div>
                             </div>
                             
-                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า</button>
+                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า (เข้าสถานะรอระบุ โซน/ภาชนะ/อุณหภูมิ โดย QC)</button>
                         </form>
                     </div>
                 </div>
@@ -1779,6 +1785,25 @@
                 const cards = t.map(s => { 
                     const i = window.localData.items.find(x => String(x.id) === String(s.itemId)); 
                     if (!i) return ''; 
+                    
+                    const storageInputFields = `
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                            <div class="md:col-span-3 text-[10px] font-bold text-indigo-600 mb-1"><i class="fas fa-map-marker-alt"></i> ระบุข้อมูลจัดเก็บ (บังคับกรอกเมื่อ PASS)</div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 uppercase block">โซนจัดเก็บ</label>
+                                <input type="text" id="qc-loc-${s.id}" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:border-primary outline-none bg-white" placeholder="เช่น A1" value="${s.location === 'รอระบุ (Staging)' ? '' : (s.location || '')}">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 uppercase block">ภาชนะ</label>
+                                <input type="text" id="qc-container-${s.id}" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:border-primary outline-none bg-white" placeholder="เช่น ถัง" value="${s.container === '-' ? '' : (s.container || '')}">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 uppercase block">อุณหภูมิ</label>
+                                <input type="text" id="qc-temp-${s.id}" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:border-primary outline-none bg-white" placeholder="เช่น 2-8°C" value="${s.temperature === '-' ? '' : (s.temperature || '')}">
+                            </div>
+                        </div>
+                    `;
+
                     return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center">
                                 <div class="mb-4">
                                     <div class="flex justify-between items-start mb-4">
@@ -1806,6 +1831,7 @@
                                             <label class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">หมายเหตุ</label>
                                             <input type="text" id="qc-remark-${s.id}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary outline-none transition-all placeholder-slate-300" placeholder="เช่น สภาพกล่อง, สี, กลิ่น...">
                                         </div>
+                                        ${storageInputFields}
                                     </div>
                                 </div>
                                 <div class="flex gap-2 pt-3 border-t border-slate-100 mt-2">
