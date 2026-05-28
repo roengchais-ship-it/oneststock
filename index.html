@@ -33,7 +33,6 @@
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         
-        /* [FIXED] เพิ่ม Animation ที่ขาดหายไปสำหรับ Dropdown */
         @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in-down { animation: fadeInDown 0.2s ease-out forwards; }
         
@@ -58,7 +57,6 @@
         
         .voided-row { opacity: 0.6; filter: grayscale(0.5); text-decoration: line-through; }
         
-        /* ซ่อน Scrollbar แนวนอนสำหรับ Segmented Control ในจอมือถือ */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -163,7 +161,7 @@
         </main>
     </div>
 
-    <!-- MODALS -->
+    <!-- MODALS (Profiles, Edit, Print, etc.) -->
     <!-- Profile Modal -->
     <div id="profile-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/20">
@@ -440,9 +438,6 @@
 
     <!-- SCRIPT 1: GLOBAL STATE, CORE LOGIC, AND RENDERERS -->
     <script>
-        // ==========================================
-        // 1. TIMEOUT FALLBACK (ANTI-FREEZE)
-        // ==========================================
         window.fallbackTimeout = setTimeout(() => {
             const loader = document.getElementById('loading-screen');
             if(loader && !loader.classList.contains('hidden')) {
@@ -456,20 +451,18 @@
             }
         }, 8000);
 
-        // ==========================================
-        // 2. GLOBAL DATA & STATE
-        // ==========================================
         window.localData = window.localData || { items: [], stock: [], transactions: [], users: [] };
         window.appState = window.appState || { 
             currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
             inventoryFilter: 'ALL', inventoryLowStockOnly: false, inventoryExpiringSoonOnly: false,
             receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
-            historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: ''
+            historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: '',
+            reportTab: 'aging' // Default report tab
         };
 
         const menuConfig = {
-            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
-            STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}],
+            ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
+            STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}],
             QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'}]
         };
 
@@ -483,9 +476,6 @@
         window.alertError = (m) => alert("❌ " + m);
         window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
 
-        // ==========================================
-        // AUTO-RECOVERY
-        // ==========================================
         window.runAutoRecovery = async () => {
             if (!window.db_setDoc || !window.appId || !window.localData.items.length) return;
             const orphanedStocks = window.localData.stock.filter(s => s.qty > 0 && !window.localData.items.find(i => String(i.id) === String(s.itemId)));
@@ -514,9 +504,6 @@
             }
         };
 
-        // ==========================================
-        // 3. DATABASE ACTION HANDLERS
-        // ==========================================
         window.handleLogin = async function(e) {
             e.preventDefault();
             const d = new FormData(e.target);
@@ -615,7 +602,6 @@
         window.saveEditItem = async () => { 
             const id=document.getElementById('edit-item-id').value; 
             try { 
-                // [FIXED] ใช้ || 0 เพื่อป้องกันกรณี parseInt("") แล้วได้ NaN
                 const newData = { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) || 0 };
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), newData); 
                 else { const item = window.localData.items.find(x => x.id === id); if (item) Object.assign(item, newData); }
@@ -739,7 +725,6 @@
             const data = Object.fromEntries(new FormData(form).entries());
             data.itemId = itemId;
             
-            // [FIXED] เพิ่มการเช็คค่า Qty ไม่ให้เป็นติดลบ หรือ 0
             const qtyCheck = parseFloat(data.qty);
             if (isNaN(qtyCheck) || qtyCheck <= 0) {
                 return window.alertError('จำนวนที่รับเข้าต้องมากกว่า 0');
@@ -761,9 +746,10 @@
             const factor = window.getConversionFactor(d.unit, item.unit);
             const convertedQty = parseFloat(d.qty) * factor; 
 
-            const finalLocation = 'รอระบุ (Staging)';
-            const finalContainer = '-';
-            const finalTemp = '-';
+            // เปลี่ยนมารับค่า location, container, temperature จากฟอร์มถ้ามี
+            const finalLocation = (d.location && d.location.trim() !== '') ? d.location.trim() : 'รอระบุ (Staging)';
+            const finalContainer = (d.container && d.container.trim() !== '') ? d.container.trim() : '-';
+            const finalTemp = (d.temperature && d.temperature.trim() !== '') ? d.temperature.trim() : '-';
 
             const stockPayload = { 
                 itemId: d.itemId, lotNo: d.lotNo, qty: convertedQty, unit: item.unit, status: 'WAIT_QC', expDate: d.expDate, 
@@ -858,7 +844,6 @@
                 }
 
                 for(let c of window.appState.issueCart) { 
-                    // [FIXED] ใช้ timestamp เรียงเพื่อความชัวร์ (ถ้าได้รับมาพร้อมกันให้ดูเวลา)
                     let lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)); 
                     if (c.selectedLot !== 'AUTO') { lots = lots.filter(s => s.lotNo === c.selectedLot); }
                     let rem = c.baseQty; 
@@ -1121,7 +1106,6 @@
                 <body>
                     ${labelsHTML}
                     <script>
-                        // [FIXED] ใช้ DOMContentLoaded เพื่อให้ชัวร์ว่าโหลดครบก่อนเขียนบาร์โค้ด และสั่งปริ้น
                         document.addEventListener("DOMContentLoaded", () => {
                             document.querySelectorAll('.barcode-target').forEach(el => {
                                 JsBarcode(el, el.getAttribute('data-code'), {
@@ -1258,6 +1242,7 @@
         window.setHistoryLotFilter = (lotVal) => { window.appState.historyFilterLot = lotVal; window.refreshView(); };
         window.switchQCTab = (tab) => { window.appState.qcTab = tab; window.refreshView(); };
         window.updateReceiveHistoryFilter = (date) => { window.appState.receiveHistoryFilterDate = date; window.refreshView(); };
+        window.switchReportTab = (tab) => { window.appState.reportTab = tab; window.refreshView(); };
         
         window.filterInventoryTable = () => { 
             const f = (document.getElementById('inventory-search').value || '').toLowerCase(); 
@@ -1289,7 +1274,7 @@
         };
 
         window.downloadReceiveTemplate = () => {
-            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "ข้อควรระวังในการจัดเก็บ"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "-"]]);
+            const ws = XLSX.utils.aoa_to_sheet([["รหัสสินค้า", "Lot No", "จำนวน", "หน่วย", "วันหมดอายุ", "ข้อควรระวังในการจัดเก็บ", "โซนจัดเก็บ", "ภาชนะ", "อุณหภูมิ"], ["ITEM-001", "LOT-001", "100", "pcs", "2025-12-31", "-", "A1", "พาเลท", "2-8 C"]]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template");
             XLSX.writeFile(wb, "Receive_Template.xlsx");
@@ -1362,7 +1347,6 @@
             const pw = window.open('', '_blank');
             pw.document.write(`<html><head><title>Print Stock Check - Onest stock</title><style>@page { size: A4; margin: 0.5cm; } body { font-family: 'Sarabun', sans-serif; }</style></head><body>${html}</body></html>`);
             pw.document.close();
-            // [FIXED] ไม่ใช้ pw.onload เพื่อหลีกเลี่ยงบั๊ก Window ไม่เด้ง
             setTimeout(() => { pw.print(); pw.close(); }, 500); 
         };
 
@@ -1457,11 +1441,19 @@
                         const expDate = (row["วันหมดอายุ"] || row["Exp Date"] || "2099-12-31").toString().trim();
                         
                         const precautions = (row["ข้อควรระวังในการจัดเก็บ"] || row["Precautions"] || "-").toString().trim();
+                        
+                        // รองรับการระบุโซน ภาชนะ อุณหภูมิ ผ่าน Excel ด้วย (ไม่บังคับ)
+                        const loc = (row["โซนจัดเก็บ"] || row["Location"] || "").toString().trim();
+                        const container = (row["ภาชนะ"] || row["Container"] || "").toString().trim();
+                        const temp = (row["อุณหภูมิ"] || row["Temperature"] || "").toString().trim();
 
                         const item = window.localData.items.find(i => (i.code||'').toUpperCase() === code);
                         
                         if (item && qty > 0) {
-                            await window.receiveItem({ itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, precautions: precautions });
+                            await window.receiveItem({ 
+                                itemId: item.id, lotNo: lotNo, qty: qty, unit: unit, expDate: expDate, 
+                                precautions: precautions, location: loc, container: container, temperature: temp 
+                            });
                             successCount++;
                         } else { errorCount++; }
                     }
@@ -1493,6 +1485,7 @@
             else if(viewId==='qc-task') content.innerHTML=renderQCTask();
             else if(viewId==='issue') content.innerHTML=renderIssueForm();
             else if(viewId==='history') content.innerHTML=renderHistory();
+            else if(viewId==='reports') content.innerHTML=renderReports(); 
             else if(viewId==='user-list') content.innerHTML=renderUserList();
         };
 
@@ -1556,6 +1549,278 @@
                         </tbody></table></div>
                     </div>
                 </div>`;
+        }
+
+        function renderReports() {
+            const currentTab = window.appState.reportTab || 'aging';
+            const now = Date.now();
+            
+            const tabButtons = `
+                <div class="flex flex-wrap justify-center gap-2 mb-6">
+                    <button onclick="window.switchReportTab('aging')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'aging' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-hourglass-half mr-2"></i> Aging & Dead Stock</button>
+                    <button onclick="window.switchReportTab('location')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'location' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-map-location-dot mr-2"></i> พื้นที่จัดเก็บ (Location)</button>
+                    <button onclick="window.switchReportTab('replenish')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'replenish' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-cart-arrow-down mr-2"></i> สั่งซื้อเติมสต็อก (Min Stock)</button>
+                    <button onclick="window.switchReportTab('expiry')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'expiry' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-calendar-times mr-2"></i> สินค้าใกล้หมดอายุ</button>
+                    <button onclick="window.switchReportTab('turnover')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'turnover' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-chart-line mr-2"></i> สรุปความเคลื่อนไหว</button>
+                </div>
+            `;
+
+            let contentHTML = '';
+
+            // 1. AGING REPORT
+            if (currentTab === 'aging') {
+                const activeStocks = window.localData.stock.filter(s => s.qty > 0);
+                let totalDays = 0, lotCount = 0, deadStockCount = 0;
+                
+                const tableData = activeStocks.map(s => {
+                    const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
+                    if (!item) return null;
+                    const rDate = new Date(s.receivedDate || s.timestamp);
+                    let days = 0;
+                    if (!isNaN(rDate.getTime())) {
+                        days = Math.floor((now - rDate.getTime()) / (1000 * 60 * 60 * 24));
+                    }
+                    totalDays += days;
+                    lotCount++;
+                    if (days > 90) deadStockCount++;
+
+                    return { code: item.code, name: item.name, lot: s.lotNo, qty: s.qty, unit: item.unit, rDate: s.receivedDate, days };
+                }).filter(Boolean).sort((a,b) => b.days - a.days);
+
+                const avgAge = lotCount > 0 ? (totalDays / lotCount).toFixed(1) : 0;
+                
+                const trs = tableData.map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-center text-sm">
+                        <td class="py-3 px-4 font-mono font-bold text-indigo-600 text-left">${d.code}</td>
+                        <td class="py-3 px-4 text-slate-700 text-left truncate max-w-[200px]" title="${d.name}">${d.name}</td>
+                        <td class="py-3 px-4 font-mono">${d.lot}</td>
+                        <td class="py-3 px-4">${d.qty.toFixed(2)} <span class="text-[10px] uppercase text-slate-500">${d.unit}</span></td>
+                        <td class="py-3 px-4 text-slate-500">${d.rDate}</td>
+                        <td class="py-3 px-4 font-bold ${d.days > 90 ? 'text-red-500' : (d.days > 30 ? 'text-orange-500' : 'text-emerald-500')}">${d.days}</td>
+                    </tr>
+                `).join('');
+
+                contentHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-xl"><i class="fas fa-layer-group"></i></div>
+                            <div><p class="text-xs font-bold text-slate-400 uppercase">จำนวน Lot ทั้งหมด</p><p class="text-2xl font-bold text-slate-800">${lotCount.toLocaleString()}</p></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl"><i class="fas fa-clock"></i></div>
+                            <div><p class="text-xs font-bold text-slate-400 uppercase">อายุสินค้าเฉลี่ย (วัน)</p><p class="text-2xl font-bold text-slate-800">${avgAge}</p></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border ${deadStockCount > 0 ? 'border-red-300' : 'border-slate-200'} shadow-sm flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xl"><i class="fas fa-skull-crossbones"></i></div>
+                            <div><p class="text-xs font-bold text-slate-400 uppercase">Dead Stock (>90 วัน)</p><p class="text-2xl font-bold ${deadStockCount > 0 ? 'text-red-600 animate-pulse' : 'text-slate-800'}">${deadStockCount.toLocaleString()} Lot</p></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50"><h3 class="font-bold text-slate-800">รายละเอียดอายุสินค้าเรียงตามความเก่า (Aging Details)</h3></div>
+                        <div class="overflow-auto max-h-[500px]">
+                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">Lot No.</th><th class="py-3 px-4 border-b">ยอดคงเหลือ</th><th class="py-3 px-4 border-b">วันที่รับเข้า</th><th class="py-3 px-4 border-b">อายุ (วัน)</th></tr></thead>
+                            <tbody>${trs.length ? trs : '<tr><td colspan="6" class="text-center py-10 text-slate-400">ไม่มีข้อมูล</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 2. LOCATION REPORT
+            else if (currentTab === 'location') {
+                const activeStocks = window.localData.stock.filter(s => s.qty > 0);
+                const groupedByLoc = {};
+                
+                activeStocks.forEach(s => {
+                    const loc = (s.location && s.location !== '-') ? s.location : 'ยังไม่ระบุโซน (Staging)';
+                    if (!groupedByLoc[loc]) groupedByLoc[loc] = [];
+                    groupedByLoc[loc].push(s);
+                });
+
+                let locCards = '';
+                Object.keys(groupedByLoc).sort().forEach(loc => {
+                    const lots = groupedByLoc[loc];
+                    const rows = lots.map(s => {
+                        const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
+                        return `
+                            <tr class="border-b last:border-0 hover:bg-slate-50 text-[12px]">
+                                <td class="py-2 px-3 font-mono font-bold text-indigo-600">${item ? item.code : '?'}</td>
+                                <td class="py-2 px-3 truncate max-w-[150px]" title="${item ? item.name : '?'}">${item ? item.name : '?'}</td>
+                                <td class="py-2 px-3 font-mono text-slate-500">${s.lotNo}</td>
+                                <td class="py-2 px-3 text-right font-bold text-slate-700">${s.qty.toFixed(2)} <span class="text-[9px] font-normal">${item?item.unit:''}</span></td>
+                                <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded text-[9px] ${s.status==='AVAILABLE'?'bg-emerald-50 text-emerald-600':s.status==='WAIT_QC'?'bg-amber-50 text-amber-600':'bg-slate-100 text-slate-600'}">${s.status}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    locCards += `
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+                            <div class="px-4 py-3 bg-indigo-50/50 border-b border-slate-100 font-bold text-indigo-800 flex justify-between items-center">
+                                <span><i class="fas fa-map-marker-alt mr-2 text-indigo-400"></i> ${loc}</span>
+                                <span class="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-xs">${lots.length} Lot</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <thead class="text-[10px] text-slate-400 uppercase bg-slate-50/30"><tr><th class="py-2 px-3 border-b">รหัส</th><th class="py-2 px-3 border-b">ชื่อสินค้า</th><th class="py-2 px-3 border-b">Lot</th><th class="py-2 px-3 border-b text-right">จำนวน</th><th class="py-2 px-3 border-b text-center">สถานะ</th></tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                contentHTML = `
+                    <div class="columns-1 lg:columns-2 gap-6">
+                        ${locCards || '<div class="text-center py-10 text-slate-400 bg-white rounded-xl border border-slate-200">ไม่มีข้อมูลสต็อก</div>'}
+                    </div>
+                `;
+            }
+
+            // 3. REPLENISHMENT REPORT
+            else if (currentTab === 'replenish') {
+                const needsReplenish = window.localData.items.map(i => {
+                    const totalQty = window.localData.stock.filter(s => String(s.itemId) === String(i.id)).reduce((a,b)=>a+b.qty, 0);
+                    if (totalQty < (i.minStock || 0) && (i.minStock || 0) > 0) {
+                        return { code: i.code, name: i.name, type: i.type, unit: i.unit, current: totalQty, min: i.minStock, shortage: i.minStock - totalQty };
+                    }
+                    return null;
+                }).filter(Boolean).sort((a,b) => b.shortage - a.shortage);
+
+                const trs = needsReplenish.map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-center text-sm">
+                        <td class="py-4 px-4 font-mono font-bold text-indigo-600 text-left">${d.code}</td>
+                        <td class="py-4 px-4 text-slate-700 text-left">${d.name}</td>
+                        <td class="py-4 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100">${d.type}</span></td>
+                        <td class="py-4 px-4 font-bold text-slate-500">${d.min}</td>
+                        <td class="py-4 px-4 font-bold text-red-500">${d.current.toFixed(2)}</td>
+                        <td class="py-4 px-4 font-bold text-orange-600 bg-orange-50">${d.shortage.toFixed(2)}</td>
+                        <td class="py-4 px-4 uppercase text-[10px] text-slate-400">${d.unit}</td>
+                    </tr>
+                `).join('');
+
+                contentHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-red-50/30 flex justify-between items-center">
+                            <h3 class="font-bold text-red-700"><i class="fas fa-shopping-cart mr-2"></i> รายการสินค้าที่ต้องสั่งซื้อด่วน (ยอดต่ำกว่าเกณฑ์)</h3>
+                            <span class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">${needsReplenish.length} รายการ</span>
+                        </div>
+                        <div class="overflow-auto max-h-[600px]">
+                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">ประเภท</th><th class="py-3 px-4 border-b">Min Stock</th><th class="py-3 px-4 border-b">คงเหลือ</th><th class="py-3 px-4 border-b text-orange-600 bg-orange-50">ยอดที่ขาด (Shortage)</th><th class="py-3 px-4 border-b">หน่วย</th></tr></thead>
+                            <tbody>${trs.length ? trs : '<tr><td colspan="7" class="text-center py-20 text-emerald-500 font-bold"><i class="fas fa-check-circle text-4xl mb-3 block"></i> สินค้าทุกรายการอยู่ในระดับปลอดภัย (เกิน Min Stock)</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 4. EXPIRATION RISK REPORT
+            else if (currentTab === 'expiry') {
+                const riskLots = window.localData.stock.filter(s => s.qty > 0 && s.expDate && s.expDate !== '-').map(s => {
+                    const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
+                    if (!item) return null;
+                    const exp = new Date(s.expDate);
+                    if (isNaN(exp.getTime())) return null;
+                    
+                    const diffDays = Math.ceil((exp.getTime() - now) / (1000 * 60 * 60 * 24));
+                    let riskLvl = 'SAFE'; let color = 'text-emerald-500 bg-emerald-50 border-emerald-200'; let label = 'ปกติ';
+                    if (diffDays < 0) { riskLvl = 'EXPIRED'; color = 'text-white bg-red-600 border-red-700'; label = 'หมดอายุแล้ว'; }
+                    else if (diffDays <= 90) { riskLvl = 'CRITICAL'; color = 'text-red-700 bg-red-100 border-red-300'; label = 'วิกฤต (<3ด.)'; }
+                    else if (diffDays <= 180) { riskLvl = 'WARNING'; color = 'text-orange-700 bg-orange-100 border-orange-300'; label = 'เฝ้าระวัง (<6ด.)'; }
+
+                    return { code: item.code, name: item.name, lot: s.lotNo, qty: s.qty, unit: item.unit, expDate: s.expDate, daysLeft: diffDays, riskLvl, color, label };
+                }).filter(Boolean).sort((a,b) => a.daysLeft - b.daysLeft);
+
+                const trs = riskLots.map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-center text-sm">
+                        <td class="py-3 px-4 font-mono font-bold text-indigo-600 text-left">${d.code}</td>
+                        <td class="py-3 px-4 text-slate-700 text-left truncate max-w-[200px]" title="${d.name}">${d.name}</td>
+                        <td class="py-3 px-4 font-mono">${d.lot}</td>
+                        <td class="py-3 px-4 font-bold text-slate-600">${d.qty.toFixed(2)} <span class="text-[9px] uppercase text-slate-400 font-normal">${d.unit}</span></td>
+                        <td class="py-3 px-4 font-bold ${d.daysLeft < 90 ? 'text-red-500' : 'text-slate-700'}">${d.expDate}</td>
+                        <td class="py-3 px-4 font-bold ${d.daysLeft < 90 ? 'text-red-500' : 'text-slate-600'}">${d.daysLeft < 0 ? 'เลยกำหนด' : d.daysLeft + ' วัน'}</td>
+                        <td class="py-3 px-4"><span class="px-2 py-1 rounded-full text-[10px] font-bold border ${d.color}">${d.label}</span></td>
+                    </tr>
+                `).join('');
+
+                contentHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-orange-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-orange-800"><i class="fas fa-exclamation-triangle mr-2"></i> รายงานเตือนวันหมดอายุตามความเสี่ยง (FEFO Planning)</h3>
+                        </div>
+                        <div class="overflow-auto max-h-[600px]">
+                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">Lot No.</th><th class="py-3 px-4 border-b">คงเหลือ</th><th class="py-3 px-4 border-b">วันหมดอายุ</th><th class="py-3 px-4 border-b">เวลาที่เหลือ</th><th class="py-3 px-4 border-b">ระดับความเสี่ยง</th></tr></thead>
+                            <tbody>${trs.length ? trs : '<tr><td colspan="7" class="text-center py-20 text-slate-400 italic">ไม่มีข้อมูล Lot ที่ระบุวันหมดอายุ</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 5. TURNOVER SUMMARY
+            else if (currentTab === 'turnover') {
+                const stats = {};
+                window.localData.transactions.forEach(t => {
+                    if (t.status === 'VOIDED' || (t.type !== 'RECEIVE' && t.type !== 'ISSUE')) return;
+                    
+                    const item = window.localData.items.find(i => String(i.id) === String(t.itemId));
+                    if (!item) return;
+                    
+                    const tDate = new Date(t.timestamp);
+                    if (isNaN(tDate.getTime())) return;
+                    
+                    const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+                    
+                    if (!stats[monthKey]) stats[monthKey] = { RM: { in: 0, out: 0 }, FG: { in: 0, out: 0 }, PKG: { in: 0, out: 0 } };
+                    
+                    const tType = item.type || 'RM';
+                    if (!stats[monthKey][tType]) stats[monthKey][tType] = { in: 0, out: 0 }; // Fallback
+                    
+                    if (t.type === 'RECEIVE') stats[monthKey][tType].in += Math.abs(t.qty);
+                    else if (t.type === 'ISSUE') stats[monthKey][tType].out += Math.abs(t.qty);
+                });
+
+                const sortedMonths = Object.keys(stats).sort().reverse();
+                const trs = sortedMonths.map(month => {
+                    const data = stats[month];
+                    let rowsHtml = '';
+                    ['RM', 'PKG', 'FG'].forEach((type, idx) => {
+                        const d = data[type];
+                        if (d.in === 0 && d.out === 0) return;
+                        const net = d.in - d.out;
+                        rowsHtml += `
+                            <tr class="border-b last:border-0 hover:bg-slate-50 text-center text-sm ${idx===0?'border-t-2 border-t-slate-200':''}">
+                                ${idx === 0 ? `<td rowspan="3" class="py-4 px-4 font-bold text-slate-700 bg-slate-50/50 align-top text-lg">${month}</td>` : ''}
+                                <td class="py-3 px-4 font-bold text-indigo-600">${type}</td>
+                                <td class="py-3 px-4 font-bold text-emerald-500">${d.in > 0 ? '+' + d.in.toFixed(2) : '-'}</td>
+                                <td class="py-3 px-4 font-bold text-red-500">${d.out > 0 ? '-' + d.out.toFixed(2) : '-'}</td>
+                                <td class="py-3 px-4 font-bold ${net > 0 ? 'text-emerald-600' : (net < 0 ? 'text-red-600' : 'text-slate-500')}">${net !== 0 ? (net > 0 ? '+' : '') + net.toFixed(2) : '-'}</td>
+                            </tr>
+                        `;
+                    });
+                    return rowsHtml;
+                }).join('');
+
+                contentHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800"><i class="fas fa-exchange-alt mr-2"></i> สรุปยอดรับเข้า-เบิกออก รายเดือนแยกตามประเภท</h3>
+                        </div>
+                        <div class="overflow-auto max-h-[600px]">
+                            <table class="w-full text-sm text-center border-collapse"><thead class="bg-white sticky top-0 border-b text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b">เดือน (YYYY-MM)</th><th class="py-3 px-4 border-b">ประเภทสินค้า</th><th class="py-3 px-4 border-b text-emerald-600 bg-emerald-50/30">ยอดรับเข้า (In)</th><th class="py-3 px-4 border-b text-red-600 bg-red-50/30">ยอดเบิกออก (Out)</th><th class="py-3 px-4 border-b bg-slate-50">ยอดสุทธิ (Net)</th></tr></thead>
+                            <tbody>${trs.length ? trs : '<tr><td colspan="5" class="text-center py-20 text-slate-400 italic">ไม่มีข้อมูลการเคลื่อนไหว</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="max-w-7xl mx-auto">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center"><i class="fas fa-file-invoice mr-3 text-primary"></i> ศูนย์รวมรายงาน (Reports Center)</h2>
+                    ${tabButtons}
+                    <div class="fade-in">${contentHTML}</div>
+                </div>
+            `;
         }
 
         function renderItemMaster() {
@@ -1839,7 +2104,26 @@
                                 </div>
                             </div>
                             
-                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า (เข้าสถานะรอระบุ โซน/ภาชนะ/อุณหภูมิ โดย QC)</button>
+                            <!-- ส่วนที่เพิ่มเข้ามาใหม่: โซนจัดเก็บ ภาชนะ อุณหภูมิ แบบเป็นตัวเลือก ไม่บังคับกรอก -->
+                            <div class="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 mt-4">
+                                <h4 class="text-xs font-bold text-indigo-600 mb-3"><i class="fas fa-map-marker-alt mr-1"></i> ข้อมูลการจัดเก็บ (ระบุเลย หรือปล่อยว่างให้ QC ระบุ)</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="text-xs font-bold text-slate-500 block mb-1">โซนจัดเก็บ</label>
+                                        <input name="location" class="w-full border-slate-200 border p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น A1, ชั้น 2">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs font-bold text-slate-500 block mb-1">ภาชนะ</label>
+                                        <input name="container" class="w-full border-slate-200 border p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น ถัง, พาเลท">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs font-bold text-slate-500 block mb-1">อุณหภูมิ</label>
+                                        <input name="temperature" class="w-full border-slate-200 border p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น 2-8 °C">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า (เข้าสถานะรอตรวจสอบ โดย QC)</button>
                         </form>
                     </div>
                 </div>
@@ -1898,7 +2182,7 @@
 
                     const storageInputFields = `
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
-                            <div class="md:col-span-3 text-[10px] font-bold text-indigo-600 mb-1"><i class="fas fa-map-marker-alt"></i> ระบุข้อมูลจัดเก็บ (บังคับกรอกเมื่อ PASS)</div>
+                            <div class="md:col-span-3 text-[10px] font-bold text-indigo-600 mb-1"><i class="fas fa-map-marker-alt"></i> ยืนยัน/แก้ไขข้อมูลจัดเก็บ (บังคับกรอกเมื่อ PASS)</div>
                             <div>
                                 <label class="text-[9px] font-bold text-slate-500 uppercase block">โซนจัดเก็บ</label>
                                 <input type="text" id="qc-loc-${s.id}" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:border-primary outline-none bg-white" placeholder="เช่น A1" value="${s.location === 'รอระบุ (Staging)' ? '' : (s.location || '')}">
@@ -2004,7 +2288,7 @@
                 `;
             }
         }
-        
+
         function renderIssueForm() { 
             const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset()); window.appState.issueDate=now.toISOString().slice(0,16); 
             const l=window.appState.issueCart.map((c,i)=>`<tr class="border-b transition-colors hover:bg-slate-50/30 text-center text-sm font-medium"><td class="p-3 font-bold text-primary text-left font-mono">${c.item.code||'-'}</td><td class="p-3 text-left font-medium text-slate-700">${c.item.name||'-'}</td><td class="p-3 text-center"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-mono">${c.selectedLot === 'AUTO' ? 'อัตโนมัติ (FIFO)' : c.selectedLot}</span></td><td class="p-3 text-center"><div class="font-bold text-slate-700">${c.displayQty} ${c.displayUnit}</div><div class="text-[10px] text-slate-400 italic text-center">(= ${c.baseQty.toFixed(3)} ${c.unit})</div></td><td class="p-3 text-center"><button type="button" onclick="window.removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); 
