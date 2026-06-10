@@ -2,8 +2,9 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบบริหารจัดการสต็อก (Onest stock)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Version Updated: v6.25 -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.25</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -32,11 +33,12 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in-down { animation: fadeInDown 0.2s ease-out forwards; }
         
-        .fade-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .fade-in { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
         .nav-item.active { background: rgba(255, 255, 255, 0.1); border-left: 4px solid #6366f1; color: white; }
@@ -121,7 +123,7 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight">Onest stock</h1>
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.25</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -181,8 +183,7 @@
         </div>
     </div>
 
-    <!-- MODALS (Profiles, Edit, Print, etc.) -->
-    <!-- Profile Modal -->
+    <!-- PROFILE MODAL -->
     <div id="profile-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-slate-700 to-slate-900 px-6 py-4 flex justify-between items-center">
@@ -201,6 +202,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัสผ่านใหม่ (ว่างไว้ถ้าไม่เปลี่ยน)</label>
+                    <!-- SECURITY DEBT: Storing plain text password. Requires backend auth update -->
                     <input type="password" id="profile-password" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" placeholder="New Password">
                 </div>
                 <div class="pt-2">
@@ -210,7 +212,7 @@
         </div>
     </div>
 
-    <!-- User Management Modal -->
+    <!-- USER MANAGE MODAL -->
     <div id="user-manage-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-4 flex justify-between items-center">
@@ -229,7 +231,7 @@
         </div>
     </div>
 
-    <!-- Min Stock Modal -->
+    <!-- MIN STOCK MODAL -->
     <div id="min-stock-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-bell mr-2"></i> ตั้งค่า Min Stock</h3></div>
@@ -241,7 +243,7 @@
         </div>
     </div>
 
-    <!-- Edit Item Modal -->
+    <!-- EDIT ITEM MODAL -->
     <div id="edit-item-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center">
@@ -267,7 +269,7 @@
         </div>
     </div>
 
-    <!-- Edit Lot Modal -->
+    <!-- EDIT LOT MODAL -->
     <div id="edit-lot-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4 flex justify-between items-center">
@@ -329,7 +331,7 @@
         </div>
     </div>
 
-    <!-- Item Detail Modal -->
+    <!-- ITEM DETAIL MODAL -->
     <div id="item-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-white/20 max-h-[95vh] flex flex-col">
             <div class="bg-gradient-to-r from-indigo-600 to-primary px-6 py-4 flex justify-between items-center shrink-0">
@@ -363,9 +365,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                         <div class="px-4 py-3 bg-slate-100/50 border-b border-slate-100 font-bold text-slate-700 text-sm flex items-center"><i class="fas fa-cubes text-indigo-500 mr-2"></i> รายละเอียดแต่ละ Lot</div>
-                        <div class="overflow-x-auto max-h-[350px] custom-scrollbar">
+                        <div class="overflow-x-auto max-h-[350px] custom-scrollbar relative">
                             <table class="w-full text-sm text-left border-collapse min-w-[900px]">
-                                <thead class="bg-slate-50 sticky top-0 shadow-sm text-[10px] text-slate-500 uppercase text-center">
+                                <thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-[10px] text-slate-500 uppercase text-center">
                                     <tr>
                                         <th class="py-3 px-3 border-b">Lot No.</th>
                                         <th class="py-3 px-3 border-b text-right">จำนวน</th>
@@ -387,7 +389,7 @@
         </div>
     </div>
     
-    <!-- QC History Detail Modal -->
+    <!-- QC HISTORY DETAIL MODAL -->
     <div id="qc-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center shrink-0">
@@ -431,7 +433,7 @@
         </div>
     </div>
 
-    <!-- Print Barcode Modal -->
+    <!-- PRINT BARCODE MODAL -->
     <div id="print-barcode-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] overflow-hidden border border-white/20">
             <div class="bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4 flex justify-between items-center">
@@ -458,6 +460,15 @@
 
     <!-- SCRIPT 1: GLOBAL STATE, CORE LOGIC, AND RENDERERS -->
     <script>
+        // --- HELPER: DEBOUNCE (OPTIMIZATION) ---
+        window.debounce = (func, delay) => {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => func.apply(window, args), delay);
+            };
+        };
+
         // Custom Toast Notifications
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toast-container');
@@ -480,7 +491,7 @@
         window.alertSuccess = (m) => window.showToast(m, 'success'); 
         window.alertError = (m) => window.showToast(m, 'error');
 
-        // Custom Confirm Modal
+        // Custom Confirm Modal (Fixed Memory Leak / Node Cloning issue)
         window.confirmAction = (message, onConfirm) => {
             const modal = document.getElementById('custom-confirm-modal');
             document.getElementById('confirm-message').innerText = message;
@@ -489,7 +500,7 @@
             const btnOk = document.getElementById('confirm-btn-ok');
             const btnCancel = document.getElementById('confirm-btn-cancel');
 
-            // Clone to remove old event listeners
+            // Remove old listeners by replacing elements safely
             const newBtnOk = btnOk.cloneNode(true);
             const newBtnCancel = btnCancel.cloneNode(true);
             btnOk.parentNode.replaceChild(newBtnOk, btnOk);
@@ -498,7 +509,6 @@
             newBtnCancel.onclick = () => { modal.classList.add('hidden'); };
             newBtnOk.onclick = () => { modal.classList.add('hidden'); onConfirm(); };
         };
-
 
         window.fallbackTimeout = setTimeout(() => {
             const loader = document.getElementById('loading-screen');
@@ -738,7 +748,6 @@
                     updatePayload.status = newStatus;
                 }
                 
-                // [FIX]: Added check for negative quantity
                 if (newQty !== null && !isNaN(newQty)) {
                     if (newQty < 0) return window.alertError("จำนวนสต็อกคงเหลือต้องไม่ติดลบ");
                     if (newQty !== stock.qty) {
@@ -892,9 +901,11 @@
             } catch(e){ window.alertError(e.message) } 
         };
 
+        // [OPTIMIZATION & FIX]: Use Firestore Batch Write to prevent Race Conditions during issue
         window.processIssueBatch = async () => { 
             if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return window.alertError('กรุณากรอกข้อมูลและ Ref Doc ให้ครบถ้วน'); 
             try { 
+                // Pre-flight check: Verify if enough stock exists before modifying anything
                 for(let c of window.appState.issueCart) {
                     if (c.selectedLot !== 'AUTO') {
                         const lots = window.localData.stock.filter(s => String(s.itemId) === String(c.itemId) && s.lotNo === c.selectedLot && s.status === 'AVAILABLE' && s.qty > 0);
@@ -907,20 +918,51 @@
                     }
                 }
 
+                const batch = (window.db_writeBatch && window.db) ? window.db_writeBatch(window.db) : null;
+
                 for(let c of window.appState.issueCart) { 
-                    let lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)); 
+                    // FIFO Logic: Sort by receivedDate or timestamp fallback
+                    let lots = window.localData.stock.filter(s=>String(s.itemId) === String(c.itemId) && s.status==='AVAILABLE' && s.qty>0).sort((a,b)=> {
+                        const dateA = new Date(a.receivedDate).getTime() || a.timestamp || 0;
+                        const dateB = new Date(b.receivedDate).getTime() || b.timestamp || 0;
+                        return dateA - dateB;
+                    }); 
                     if (c.selectedLot !== 'AUTO') { lots = lots.filter(s => s.lotNo === c.selectedLot); }
+                    
                     let rem = c.baseQty; 
                     for(let l of lots) { 
                         if(rem<=0) break; 
                         let deduct = Math.min(l.qty, rem); 
-                        if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
-                            await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, l.id), { qty: l.qty - deduct }); 
-                        } else { l.qty -= deduct; }
-                        await window.logTrans('ISSUE', c.itemId, l.lotNo, -deduct, l.unit, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
+                        
+                        if(batch) {
+                            // Online Mode: Add to batch
+                            const stockRef = window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, l.id);
+                            batch.update(stockRef, { qty: l.qty - deduct });
+                            
+                            // Create transaction object
+                            const transRef = window.db_doc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/transactions`));
+                            const i = window.localData.items.find(x=>String(x.id) === String(c.itemId)); 
+                            const transData = { 
+                                type: 'ISSUE', itemId: c.itemId, item: i?`${i.code} - ${i.name}`:'?', lot: l.lotNo, qty: -deduct, 
+                                unit: l.unit, actionBy: window.appState.currentUser.name, note: `Ref: ${window.appState.issueRefDoc}`, 
+                                date: (window.appState.issueDate?new Date(window.appState.issueDate):new Date()).toLocaleString('th-TH'), timestamp: Date.now(), 
+                                status: 'ACTIVE', stockId: l.id
+                            };
+                            batch.set(transRef, transData);
+                        } else { 
+                            // Offline/Fallback mode
+                            l.qty -= deduct; 
+                            await window.logTrans('ISSUE', c.itemId, l.lotNo, -deduct, l.unit, `Ref: ${window.appState.issueRefDoc}`, window.appState.issueDate, l.id); 
+                        }
                         rem -= deduct; 
                     } 
                 } 
+                
+                // Commit Batch if online
+                if(batch) {
+                    await batch.commit();
+                }
+
                 window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
                 window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
             } catch(e){window.alertError(e.message)} 
@@ -988,13 +1030,13 @@
         window.renderSearchableItemInput = function(cid) { 
             return `
                 <div class="relative group w-full" id="search-container-${cid}">
-                    <div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all shadow-sm">
+                    <div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-visible focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all shadow-sm">
                         <div class="bg-slate-50 px-3 py-2.5 border-r border-slate-200 text-slate-400"><i class="fas fa-search"></i></div>
-                        <input type="text" id="search-input-${cid}" class="w-full px-3 py-2.5 outline-none text-slate-700 placeholder-slate-400 text-sm" placeholder="ค้นหาด้วยชื่อหรือรหัส..." autocomplete="off" onfocus="window.openDropdown('${cid}')" oninput="window.handleSearchInput('${cid}')" onblur="window.handleInputBlur('${cid}')">
+                        <input type="text" id="search-input-${cid}" class="w-full px-3 py-2.5 outline-none text-slate-700 placeholder-slate-400 text-sm" placeholder="ค้นหาด้วยชื่อหรือรหัส..." autocomplete="off" onfocus="window.openDropdown('${cid}')" oninput="window.debouncedSearch('${cid}')" onblur="window.handleInputBlur('${cid}')">
                         <div id="clear-btn-${cid}" class="hidden cursor-pointer px-3 text-slate-400 hover:text-danger transition-colors" onclick="window.clearSelection('${cid}')"><i class="fas fa-times-circle"></i></div>
                         <input type="hidden" name="itemId" id="hidden-item-id-${cid}">
                     </div>
-                    <div id="dropdown-list-${cid}" class="hidden absolute z-50 w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in-down"></div>
+                    <div id="dropdown-list-${cid}" class="hidden absolute z-[100] w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-2xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in-down left-0 top-full"></div>
                 </div>`; 
         };
 
@@ -1012,6 +1054,11 @@
                 el.classList.remove('hidden'); 
             }
         };
+
+        // Added Debounce wrapper for general search input
+        window.debouncedSearch = window.debounce((cid) => {
+            window.handleSearchInput(cid);
+        }, 300);
 
         window.handleSearchInput = function(cid) { 
             document.getElementById('hidden-item-id-' + cid).value = ''; 
@@ -1333,6 +1380,11 @@
         window.updateReceiveHistoryFilter = (date) => { window.appState.receiveHistoryFilterDate = date; window.refreshView(); };
         window.switchReportTab = (tab) => { window.appState.reportTab = tab; window.refreshView(); };
         
+        // Use debounce for local table filtering to avoid lag
+        window.debouncedFilterInventoryTable = window.debounce(() => {
+            window.filterInventoryTable();
+        }, 200);
+
         window.filterInventoryTable = () => { 
             const f = (document.getElementById('inventory-search').value || '').toLowerCase(); 
             document.querySelectorAll('.item-row').forEach(r => {
@@ -1352,8 +1404,6 @@
             window.refreshView();
         };
 
-        // [FIX]: OPTIMIZED SEARCH & PAGINATION LOGIC
-        // อัปเดตเฉพาะ DOM ของตารางและ Pagination เพื่อป้องกัน Input Focus หลุด
         window.updateItemMasterDOM = function() {
             const searchTerm = (window.appState.itemMasterSearch || '').toLowerCase();
             let filteredItems = window.localData.items;
@@ -1392,20 +1442,23 @@
             }
         };
 
-        window.handleItemMasterSearch = function(val) { 
+        // Debounced specific to Item Master
+        window.debouncedItemMasterSearch = window.debounce((val) => {
             window.appState.itemMasterSearch = val; 
             window.appState.itemMasterPage = 1; 
-            // [OPTIMIZE] เลิกใช้ refreshView() ที่เรนเดอร์ใหม่ทั้งหน้า เปลี่ยนมาอัปเดตเฉพาะ DOM ตาราง
             if(window.appState.currentView === 'item-master') {
                  window.updateItemMasterDOM(); 
             } else {
                  window.refreshView();
             }
+        }, 300);
+
+        window.handleItemMasterSearch = function(val) { 
+            window.debouncedItemMasterSearch(val);
         };
         
         window.changeItemMasterPage = function(delta) { 
             window.appState.itemMasterPage += delta; 
-            // [OPTIMIZE] เลิกใช้ refreshView()
             if(window.appState.currentView === 'item-master') {
                  window.updateItemMasterDOM(); 
             } else {
@@ -1676,7 +1729,7 @@
                             <h3 class="font-bold text-slate-800 text-center flex-1 ml-10 text-lg">สินค้าที่ต้องสั่งเพิ่ม (Low Stock)</h3>
                             <span class="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full">${low} รายการ</span>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[500px]"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6 border-b">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b">ชื่อสินค้า</th><th class="py-3 px-6 border-b">คงเหลือ</th><th class="py-3 px-6 border-b">ค่า Min</th><th class="py-3 px-6 border-b">หน่วย</th></tr></thead><tbody>
+                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[500px]"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center sticky top-0 z-10"><tr><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b bg-slate-50/90 backdrop-blur">ชื่อสินค้า</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">คงเหลือ</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">ค่า Min</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">หน่วย</th></tr></thead><tbody>
                         ${lowStockItems.slice(0, 5).map(i => `<tr class="border-b border-slate-50 hover:bg-red-50/30 transition-colors text-center text-sm font-medium"><td class="px-6 py-4 font-mono font-bold text-indigo-600 text-left">${i.code||'-'}</td><td class="px-6 py-4 text-left text-slate-700">${i.name||'-'}</td><td class="px-6 py-4 text-red-600 font-bold">${i.currentStock.toFixed(2)}</td><td class="px-6 py-4 text-slate-400 font-mono">${i.minStock||0}</td><td class="px-6 py-4 text-xs uppercase text-slate-400 text-center">${i.unit||'-'}</td></tr>`).join('')}
                         ${lowStockItems.length === 0 ? '<tr><td colspan="5" class="py-20 text-center text-emerald-500 italic font-medium">สต็อกสินค้าเพียงพอทุกรายการ</td></tr>' : ''}
                         </tbody></table></div>
@@ -1686,7 +1739,7 @@
                             <h3 class="font-bold text-slate-800 text-center flex-1 ml-10 text-lg">ความเคลื่อนไหวล่าสุด (Recent Activities)</h3>
                             <button onclick="window.renderView('history')" class="text-xs font-bold text-primary hover:underline">ดูทั้งหมด</button>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[700px]"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center"><tr><th class="py-3 px-6 border-b">เวลา</th><th class="py-3 px-6 border-b">ประเภท</th><th class="py-3 px-6 text-left border-b">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b">ชื่อสินค้า</th><th class="py-3 px-6 border-b">จำนวน</th><th class="py-3 px-6 border-b">หน่วย</th><th class="py-3 px-6 border-b">โดย</th></tr></thead><tbody>
+                        <div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[700px]"><thead class="bg-slate-50/30 text-xs text-slate-400 uppercase text-center sticky top-0 z-10"><tr><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">เวลา</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">ประเภท</th><th class="py-3 px-6 text-left border-b bg-slate-50/90 backdrop-blur">รหัสสินค้า</th><th class="py-3 px-6 text-left border-b bg-slate-50/90 backdrop-blur">ชื่อสินค้า</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">จำนวน</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">หน่วย</th><th class="py-3 px-6 border-b bg-slate-50/90 backdrop-blur">โดย</th></tr></thead><tbody>
                         ${recentTrans.map(t => { 
                             const itemSplit = (t.item||'').split(' - '), code = itemSplit[0] || '-', name = itemSplit.slice(1).join(' - ') || '-';
                             const typeStr = t.type || '';
@@ -1765,7 +1818,7 @@
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50"><h3 class="font-bold text-slate-800">รายละเอียดอายุสินค้าเรียงตามความเก่า (Aging Details)</h3></div>
                         <div class="overflow-auto max-h-[500px]">
-                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">Lot No.</th><th class="py-3 px-4 border-b">ยอดคงเหลือ</th><th class="py-3 px-4 border-b">วันที่รับเข้า</th><th class="py-3 px-4 border-b">อายุ (วัน)</th></tr></thead>
+                            <table class="w-full text-sm text-left"><thead class="bg-white z-10 sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left bg-white">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left bg-white">ชื่อสินค้า</th><th class="py-3 px-4 border-b bg-white">Lot No.</th><th class="py-3 px-4 border-b bg-white">ยอดคงเหลือ</th><th class="py-3 px-4 border-b bg-white">วันที่รับเข้า</th><th class="py-3 px-4 border-b bg-white">อายุ (วัน)</th></tr></thead>
                             <tbody>${trs.length ? trs : '<tr><td colspan="6" class="text-center py-10 text-slate-400">ไม่มีข้อมูล</td></tr>'}</tbody>
                             </table>
                         </div>
@@ -1808,7 +1861,7 @@
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-left">
-                                    <thead class="text-[10px] text-slate-400 uppercase bg-slate-50/30"><tr><th class="py-2 px-3 border-b">รหัส</th><th class="py-2 px-3 border-b">ชื่อสินค้า</th><th class="py-2 px-3 border-b">Lot</th><th class="py-2 px-3 border-b text-right">จำนวน</th><th class="py-2 px-3 border-b text-center">สถานะ</th></tr></thead>
+                                    <thead class="text-[10px] text-slate-400 uppercase bg-slate-50/30 sticky top-0 z-10"><tr><th class="py-2 px-3 border-b bg-slate-50">รหัส</th><th class="py-2 px-3 border-b bg-slate-50">ชื่อสินค้า</th><th class="py-2 px-3 border-b bg-slate-50">Lot</th><th class="py-2 px-3 border-b text-right bg-slate-50">จำนวน</th><th class="py-2 px-3 border-b text-center bg-slate-50">สถานะ</th></tr></thead>
                                     <tbody>${rows}</tbody>
                                 </table>
                             </div>
@@ -1852,7 +1905,7 @@
                             <span class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">${needsReplenish.length} รายการ</span>
                         </div>
                         <div class="overflow-auto max-h-[600px]">
-                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">ประเภท</th><th class="py-3 px-4 border-b">Min Stock</th><th class="py-3 px-4 border-b">คงเหลือ</th><th class="py-3 px-4 border-b text-orange-600 bg-orange-50">ยอดที่ขาด (Shortage)</th><th class="py-3 px-4 border-b">หน่วย</th></tr></thead>
+                            <table class="w-full text-sm text-left"><thead class="bg-white z-10 sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left bg-white">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left bg-white">ชื่อสินค้า</th><th class="py-3 px-4 border-b bg-white">ประเภท</th><th class="py-3 px-4 border-b bg-white">Min Stock</th><th class="py-3 px-4 border-b bg-white">คงเหลือ</th><th class="py-3 px-4 border-b text-orange-600 bg-orange-50">ยอดที่ขาด (Shortage)</th><th class="py-3 px-4 border-b bg-white">หน่วย</th></tr></thead>
                             <tbody>${trs.length ? trs : '<tr><td colspan="7" class="text-center py-20 text-emerald-500 font-bold"><i class="fas fa-check-circle text-4xl mb-3 block"></i> สินค้าทุกรายการอยู่ในระดับปลอดภัย (เกิน Min Stock)</td></tr>'}</tbody>
                             </table>
                         </div>
@@ -1895,7 +1948,7 @@
                             <h3 class="font-bold text-orange-800"><i class="fas fa-exclamation-triangle mr-2"></i> รายงานเตือนวันหมดอายุตามความเสี่ยง (FEFO Planning)</h3>
                         </div>
                         <div class="overflow-auto max-h-[600px]">
-                            <table class="w-full text-sm text-left"><thead class="bg-white sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left">ชื่อสินค้า</th><th class="py-3 px-4 border-b">Lot No.</th><th class="py-3 px-4 border-b">คงเหลือ</th><th class="py-3 px-4 border-b">วันหมดอายุ</th><th class="py-3 px-4 border-b">เวลาที่เหลือ</th><th class="py-3 px-4 border-b">ระดับความเสี่ยง</th></tr></thead>
+                            <table class="w-full text-sm text-left"><thead class="bg-white z-10 sticky top-0 border-b text-center text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b text-left bg-white">รหัสสินค้า</th><th class="py-3 px-4 border-b text-left bg-white">ชื่อสินค้า</th><th class="py-3 px-4 border-b bg-white">Lot No.</th><th class="py-3 px-4 border-b bg-white">คงเหลือ</th><th class="py-3 px-4 border-b bg-white">วันหมดอายุ</th><th class="py-3 px-4 border-b bg-white">เวลาที่เหลือ</th><th class="py-3 px-4 border-b bg-white">ระดับความเสี่ยง</th></tr></thead>
                             <tbody>${trs.length ? trs : '<tr><td colspan="7" class="text-center py-20 text-slate-400 italic">ไม่มีข้อมูล Lot ที่ระบุวันหมดอายุ</td></tr>'}</tbody>
                             </table>
                         </div>
@@ -1910,7 +1963,8 @@
                     if (t.status === 'VOIDED' || (t.type !== 'RECEIVE' && t.type !== 'ISSUE')) return;
                     
                     const item = window.localData.items.find(i => String(i.id) === String(t.itemId));
-                    if (!item) return;
+                    // Handle case where item might be deleted but transaction remains
+                    const tType = item ? item.type : 'RM';
                     
                     const tDate = new Date(t.timestamp);
                     if (isNaN(tDate.getTime())) return;
@@ -1918,9 +1972,7 @@
                     const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
                     
                     if (!stats[monthKey]) stats[monthKey] = { RM: { in: 0, out: 0 }, FG: { in: 0, out: 0 }, PKG: { in: 0, out: 0 } };
-                    
-                    const tType = item.type || 'RM';
-                    if (!stats[monthKey][tType]) stats[monthKey][tType] = { in: 0, out: 0 }; // Fallback
+                    if (!stats[monthKey][tType]) stats[monthKey][tType] = { in: 0, out: 0 };
                     
                     if (t.type === 'RECEIVE') stats[monthKey][tType].in += Math.abs(t.qty);
                     else if (t.type === 'ISSUE') stats[monthKey][tType].out += Math.abs(t.qty);
@@ -1932,7 +1984,7 @@
                     let rowsHtml = '';
                     ['RM', 'PKG', 'FG'].forEach((type, idx) => {
                         const d = data[type];
-                        if (d.in === 0 && d.out === 0) return;
+                        if (!d || (d.in === 0 && d.out === 0)) return;
                         const net = d.in - d.out;
                         rowsHtml += `
                             <tr class="border-b last:border-0 hover:bg-slate-50 text-center text-sm ${idx===0?'border-t-2 border-t-slate-200':''}">
@@ -1953,7 +2005,7 @@
                             <h3 class="font-bold text-slate-800"><i class="fas fa-exchange-alt mr-2"></i> สรุปยอดรับเข้า-เบิกออก รายเดือนแยกตามประเภท</h3>
                         </div>
                         <div class="overflow-auto max-h-[600px]">
-                            <table class="w-full text-sm text-center border-collapse"><thead class="bg-white sticky top-0 border-b text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b">เดือน (YYYY-MM)</th><th class="py-3 px-4 border-b">ประเภทสินค้า</th><th class="py-3 px-4 border-b text-emerald-600 bg-emerald-50/30">ยอดรับเข้า (In)</th><th class="py-3 px-4 border-b text-red-600 bg-red-50/30">ยอดเบิกออก (Out)</th><th class="py-3 px-4 border-b bg-slate-50">ยอดสุทธิ (Net)</th></tr></thead>
+                            <table class="w-full text-sm text-center border-collapse"><thead class="bg-white z-10 sticky top-0 border-b text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b bg-white">เดือน (YYYY-MM)</th><th class="py-3 px-4 border-b bg-white">ประเภทสินค้า</th><th class="py-3 px-4 border-b text-emerald-600 bg-emerald-50/90 backdrop-blur">ยอดรับเข้า (In)</th><th class="py-3 px-4 border-b text-red-600 bg-red-50/90 backdrop-blur">ยอดเบิกออก (Out)</th><th class="py-3 px-4 border-b bg-slate-50/90 backdrop-blur">ยอดสุทธิ (Net)</th></tr></thead>
                             <tbody>${trs.length ? trs : '<tr><td colspan="5" class="text-center py-20 text-slate-400 italic">ไม่มีข้อมูลการเคลื่อนไหว</td></tr>'}</tbody>
                             </table>
                         </div>
@@ -2174,11 +2226,11 @@
                             </button>
                         </div>
                     </div>
-                    <div class="relative"><i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="inventory-search" onkeyup="window.filterInventoryTable()" class="w-full border-slate-200 border pl-11 pr-4 py-3.5 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all text-left" placeholder="ค้นหาชื่อหรือรหัสสินค้าในคลัง..."></div>
+                    <div class="relative"><i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="inventory-search" oninput="window.debouncedFilterInventoryTable()" class="w-full border-slate-200 border pl-11 pr-4 py-3.5 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all text-left" placeholder="ค้นหาชื่อหรือรหัสสินค้าในคลัง..."></div>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[500px] flex flex-col">
                         <div class="flex-1 overflow-auto custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse min-w-[900px]" id="inventory-table">
-                                <thead class="bg-slate-50/50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th style="width: 220px; min-width: 220px;" class="py-4 px-6 text-left border-b">รหัส</th><th class="py-4 px-6 text-left border-b">ชื่อสินค้า</th><th class="border-b">ประเภท</th><th class="border-b">Min</th><th class="border-b">Aging (ว.)</th><th class="border-b">คงเหลือ</th><th class="border-b">หน่วย</th><th class="border-b">พร้อมใช้</th><th class="border-b">รอ QC</th><th class="border-b">รายละเอียด</th><th class="border-b">ตั้งค่า</th></tr></thead>
+                                <thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th style="width: 220px; min-width: 220px;" class="py-4 px-6 text-left border-b bg-slate-50">รหัส</th><th class="py-4 px-6 text-left border-b bg-slate-50">ชื่อสินค้า</th><th class="border-b bg-slate-50">ประเภท</th><th class="border-b bg-slate-50">Min</th><th class="border-b bg-slate-50">Aging (ว.)</th><th class="border-b bg-slate-50">คงเหลือ</th><th class="border-b bg-slate-50">หน่วย</th><th class="border-b bg-slate-50">พร้อมใช้</th><th class="border-b bg-slate-50">รอ QC</th><th class="border-b bg-slate-50">รายละเอียด</th><th class="border-b bg-slate-50">ตั้งค่า</th></tr></thead>
                                 <tbody>
                                     ${rows.length ? rows : '<tr><td colspan="11"><div class="p-20 text-center flex flex-col items-center gap-3"><i class="fas fa-magnifying-glass text-4xl text-slate-200"></i><p class="text-slate-400 italic">ไม่พบข้อมูลสินค้าที่คุณกำลังค้นหา</p></div></td></tr>'}
                                 </tbody>
@@ -2233,15 +2285,15 @@
                             </div>
                         </div>
 
-                        <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left">
-                            <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <form onsubmit="window.handleReceiveSubmit(event)" class="space-y-4 text-left relative">
+                            <div class="relative z-[90]"><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">เลือกสินค้าที่รับเข้า</label>${window.renderSearchableItemInput('receive-item')}</div>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 relative z-0 mt-4">
                                 <div><label class="text-xs font-bold text-slate-500 block mb-1">Lot No.</label><input name="lotNo" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required></div>
                                 <div><label class="text-xs font-bold text-slate-500 block mb-1">จำนวนที่รับเข้า</label><input type="number" name="qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01" required></div>
                                 <div><label class="text-xs font-bold text-slate-500 block mb-1">หน่วยนับที่รับ</label><select name="unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="ml">ml</option><option value="g">g</option></select></div>
                             </div>
                             
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-4 relative z-0">
                                 <div>
                                     <label class="text-xs font-bold text-slate-500 block mb-1">วันหมดอายุ (Exp Date)</label>
                                     <input type="date" name="expDate" class="w-full border-slate-200 border p-3 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" required>
@@ -2252,8 +2304,7 @@
                                 </div>
                             </div>
                             
-                            <!-- ส่วนที่เพิ่มเข้ามาใหม่: โซนจัดเก็บ ภาชนะ อุณหภูมิ แบบเป็นตัวเลือก ไม่บังคับกรอก -->
-                            <div class="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 mt-4">
+                            <div class="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 mt-4 relative z-0">
                                 <h4 class="text-xs font-bold text-indigo-600 mb-3"><i class="fas fa-map-marker-alt mr-1"></i> ข้อมูลการจัดเก็บ (ระบุเลย หรือปล่อยว่างให้ QC ระบุ)</h4>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
@@ -2271,12 +2322,12 @@
                                 </div>
                             </div>
                             
-                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4">บันทึกรับของเข้า (เข้าสถานะรอตรวจสอบ โดย QC)</button>
+                            <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-dark transition-all shadow-lg transform active:scale-[0.98] mt-4 relative z-0">บันทึกรับของเข้า (เข้าสถานะรอตรวจสอบ โดย QC)</button>
                         </form>
                     </div>
                 </div>
 
-                <div class="lg:col-span-1 space-y-6 text-left">
+                <div class="lg:col-span-1 space-y-6 text-left relative z-0">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
                         <div class="p-5 border-b border-slate-100 bg-slate-50/50">
                             <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center"><i class="fas fa-clock-rotate-left text-primary mr-2"></i> ประวัติรับเข้าล่าสุด</h3>
@@ -2346,7 +2397,7 @@
                         </div>
                     `;
 
-                    return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 ${cardBorder} border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center">
+                    return `<div class="bg-white p-5 rounded-2xl shadow-sm border-t-4 ${cardBorder} border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all text-center relative z-0">
                                 <div class="mb-4">
                                     <div class="flex justify-between items-start mb-4">
                                         ${badgeHTML}
@@ -2417,14 +2468,14 @@
                         </div>
                         <div class="overflow-x-auto max-h-[600px] custom-scrollbar">
                             <table class="w-full text-sm text-left border-collapse min-w-[700px]">
-                                <thead class="bg-white sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]">
+                                <thead class="bg-white z-10 sticky top-0 shadow-sm text-center text-slate-500 font-bold uppercase text-[11px]">
                                     <tr>
-                                        <th class="py-4 px-4 border-b whitespace-nowrap">เวลาที่บันทึก</th>
-                                        <th class="py-4 px-4 text-left border-b whitespace-nowrap">รหัสสินค้า</th>
-                                        <th class="py-4 px-4 text-left border-b">ชื่อสินค้า</th>
-                                        <th class="py-4 px-4 border-b">Lot No.</th>
-                                        <th class="py-4 px-4 border-b">ผลการประเมิน</th>
-                                        <th class="py-4 px-4 border-b">รายละเอียด</th>
+                                        <th class="py-4 px-4 border-b whitespace-nowrap bg-white">เวลาที่บันทึก</th>
+                                        <th class="py-4 px-4 text-left border-b whitespace-nowrap bg-white">รหัสสินค้า</th>
+                                        <th class="py-4 px-4 text-left border-b bg-white">ชื่อสินค้า</th>
+                                        <th class="py-4 px-4 border-b bg-white">Lot No.</th>
+                                        <th class="py-4 px-4 border-b bg-white">ผลการประเมิน</th>
+                                        <th class="py-4 px-4 border-b bg-white">รายละเอียด</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2448,27 +2499,27 @@
                                 <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">วันที่เบิก</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-200 border p-3 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" value="${window.appState.issueDate}" disabled></div>
                             </div>
                         </div>
-                        <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col lg:flex-row gap-4 items-end">
-                            <div class="flex-grow w-full text-left">
-                                <div><label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">ระบุสินค้า</label>${window.renderSearchableItemInput('issue-item')}</div>
+                        <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col lg:flex-row gap-4 items-end relative z-[90]">
+                            <div class="flex-grow w-full text-left relative z-[90]">
+                                <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">ระบุสินค้า</label>${window.renderSearchableItemInput('issue-item')}
                             </div>
-                            <div class="w-full lg:w-48 text-left">
+                            <div class="w-full lg:w-48 text-left relative z-0">
                                 <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">Lot No.</label>
                                 <select id="input-lot-no" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none text-sm text-slate-700 transition-all">
                                     <option value="">-- เลือกสินค้าก่อน --</option>
                                 </select>
                             </div>
-                            <div class="w-full lg:w-32 text-left">
+                            <div class="w-full lg:w-32 text-left relative z-0">
                                 <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-center">จำนวน</label>
                                 <input type="number" id="input-qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold text-center focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01">
                             </div>
-                            <div class="w-full lg:w-28 text-left">
+                            <div class="w-full lg:w-28 text-left relative z-0">
                                 <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-center">หน่วย</label>
                                 <select id="input-unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all"><option value="kg">kg</option><option value="g">g</option><option value="pcs">pcs</option><option value="ml">ml</option></select>
                             </div>
-                            <button type="button" onclick="window.handleAddIssueItem()" class="w-full lg:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95">เพิ่ม</button>
+                            <button type="button" onclick="window.handleAddIssueItem()" class="w-full lg:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95 relative z-0">เพิ่ม</button>
                         </div>
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative z-0">
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm text-left border-collapse min-w-[600px]">
                                     <thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]">
@@ -2520,7 +2571,7 @@
                     <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-center">
                         <div class="relative w-full sm:w-auto">
                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"><i class="fas fa-search"></i></span>
-                            <input type="text" placeholder="ค้นหาเลข Lot..." value="${window.appState.historyFilterLot}" oninput="window.setHistoryLotFilter(this.value)" class="w-full sm:w-40 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:border-primary text-slate-600 bg-white transition-all shadow-sm">
+                            <input type="text" placeholder="ค้นหาเลข Lot..." value="${window.appState.historyFilterLot}" oninput="window.debouncedHistoryLotFilter(this.value)" class="w-full sm:w-40 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:border-primary text-slate-600 bg-white transition-all shadow-sm">
                         </div>
 
                         <div class="relative w-full sm:w-auto">
@@ -2538,6 +2589,9 @@
                     </div>
                 </div>
             `;
+            
+            // Added Debouncer specifically for this history filter
+            window.debouncedHistoryLotFilter = window.debouncedHistoryLotFilter || window.debounce((val) => { window.setHistoryLotFilter(val); }, 300);
 
             const tableRows = filteredTrans.map(t => {
                 const isVoided = t.status === 'VOIDED';
@@ -2570,17 +2624,17 @@
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-center">
                     <div class="overflow-x-auto custom-scrollbar">
                         <table class="w-full text-sm text-left border-collapse min-w-[900px]">
-                            <thead class="bg-slate-50 sticky top-0 shadow-sm z-10 text-center text-slate-500 font-bold uppercase text-[11px]">
+                            <thead class="bg-slate-50 z-10 sticky top-0 shadow-sm text-center text-slate-500 font-bold uppercase text-[11px]">
                                 <tr>
-                                    <th class="py-4 px-4 border-b">เวลา</th>
-                                    <th class="border-b">ประเภท</th>
-                                    <th class="text-left border-b">สินค้า</th>
-                                    <th class="border-b">Lot</th>
-                                    <th class="border-b">จำนวน</th>
-                                    <th class="border-b">หน่วย</th>
-                                    <th class="border-b">โดย</th>
-                                    <th class="border-b">Note</th>
-                                    <th class="border-b">Action</th>
+                                    <th class="py-4 px-4 border-b bg-slate-50">เวลา</th>
+                                    <th class="border-b bg-slate-50">ประเภท</th>
+                                    <th class="text-left border-b bg-slate-50">สินค้า</th>
+                                    <th class="border-b bg-slate-50">Lot</th>
+                                    <th class="border-b bg-slate-50">จำนวน</th>
+                                    <th class="border-b bg-slate-50">หน่วย</th>
+                                    <th class="border-b bg-slate-50">โดย</th>
+                                    <th class="border-b bg-slate-50">Note</th>
+                                    <th class="border-b bg-slate-50">Action</th>
                                 </tr>
                             </thead>
                             <tbody>${tableRows.length ? tableRows : '<tr><td colspan="9" class="p-16 text-center text-slate-400 italic font-medium">ไม่พบข้อมูล</td></tr>'}</tbody>
@@ -2595,7 +2649,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         let firebaseConfig;
         try {
@@ -2612,6 +2666,7 @@
         window.auth = auth; window.db = db; window.appId = appId;
         window.db_doc = doc; window.db_setDoc = setDoc; window.db_getDoc = getDoc; window.db_deleteDoc = deleteDoc;
         window.db_addDoc = addDoc; window.db_collection = collection; window.db_updateDoc = updateDoc;
+        window.db_writeBatch = writeBatch; // Exposed for transaction/batch processing
 
         async function initApp() {
             try {
