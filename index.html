@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.27 (Performance & UX Optimization, Added renderQCTask) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.27</title>
+    <!-- Version Updated: v6.28 (Fixed Issue Withdrawal Remark Dropdown Infinite Loading) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.28</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,8 +123,8 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <!-- V6.27 UPDATE -->
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.27</span></h1>
+                    <!-- V6.28 UPDATE -->
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.28</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -672,7 +672,6 @@
 
         window.createItem = async (d, silent=false) => { 
             try { 
-                /* Bug Fix: parsing floats for minStock instead of Int */
                 if (window.db_addDoc && window.db_collection && window.db && window.appId) {
                     await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/items`), { code: (d.code||'').toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseFloat(d.minStock)||0 }); 
                 } else {
@@ -724,7 +723,6 @@
         window.saveEditItem = async () => { 
             const id=document.getElementById('edit-item-id').value; 
             try { 
-                /* Bug Fix: Use parseFloat instead of parseInt for edit min stock */
                 const newData = { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseFloat(document.getElementById('edit-item-min').value) || 0 };
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), newData); 
                 else { const item = window.localData.items.find(x => x.id === id); if (item) Object.assign(item, newData); }
@@ -744,7 +742,6 @@
         window.saveMinStockModal = async () => { 
             const id=document.getElementById('modal-item-id').value; 
             try { 
-                /* Bug Fix: parseFloat */
                 const val = parseFloat(document.getElementById('modal-min-stock-input').value) || 0;
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), { minStock: val }); 
                 else { const item = window.localData.items.find(x => x.id === id); if (item) item.minStock = val; }
@@ -1615,7 +1612,7 @@
                             name: (row["ชื่อสินค้า"] || row["ชื่อ"] || row["Name"] || "").toString().trim(),
                             type: (row["ประเภท"] || row["Type"] || "RM").toString().trim().toUpperCase(),
                             unit: (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase(),
-                            minStock: parseFloat(row["Min Stock"] || row["Min"] || 0) /* Bug Fix */
+                            minStock: parseFloat(row["Min Stock"] || row["Min"] || 0) 
                         };
                         if (item.code && item.name) {
                             if (!window.localData.items.find(x => (x.code||'').toLowerCase() === item.code.toLowerCase())) {
@@ -1694,8 +1691,18 @@
         };
 
         window.generateRemarkOptions = () => {
-            const remarks = window.localData.withdrawalRemarks || [];
-            if (!remarks.length) return '<option value="" disabled selected>กำลังโหลดข้อมูล...</option>';
+            let remarks = window.localData.withdrawalRemarks || [];
+            
+            // V6.28 Fix: Fallback default options instantly to prevent infinite loading state
+            if (!remarks.length) {
+                remarks = [
+                    { id: 'default-1', label: 'เบิกส่งหน้าสาขา', isDefault: true },
+                    { id: 'default-2', label: 'เบิกเก็บ QC', isDefault: true },
+                    { id: 'default-3', label: 'เบิกส่งสำหรับลูกค้าออนไลน์', isDefault: true },
+                    { id: 'default-4', label: 'ชำรุด', isDefault: true },
+                    { id: 'default-5', label: 'อื่นๆ', isDefault: true, isCustomTrigger: true }
+                ];
+            }
             
             let html = '<option value="" disabled selected>-- เลือกหมายเหตุ --</option>';
             remarks.forEach(r => {
@@ -1844,7 +1851,6 @@
 
         window.refreshView = () => {
             if(window.appState && window.appState.currentView) {
-                /* Bug Fix: Preserve Input Focus during Realtime Refresh */
                 const activeEl = document.activeElement;
                 const activeId = activeEl && activeEl.id ? activeEl.id : null;
                 let selectionStart = null, selectionEnd = null;
@@ -2596,7 +2602,6 @@
                     </div>`; 
         }
 
-        /* Bug Fix: Added renderQCTask to prevent ReferenceError and enable QC workflow */
         function renderQCTask() {
             const currentTab = window.appState.qcTab || 'PENDING';
             const pendingStocks = window.localData.stock.filter(s => s.qty > 0 && (s.status === 'WAIT_QC' || s.status === 'HOLD')).sort((a,b) => b.timestamp - a.timestamp);
@@ -2831,10 +2836,11 @@
 
             onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
             
-            // V6.27: Add withdrawalRemarks listener
+            // V6.28: Fix withdrawalRemarks loading state issue
             onSnapshot(collection(db, basePath, 'withdrawalRemarks'), (s) => { 
                 window.localData.withdrawalRemarks = s.docs.map(d=>({id:d.id,...d.data()})); 
                 window.seedDefaultRemarks(); // Ensure seeds exist
+                if(window.refreshView && window.appState.currentView === 'issue') window.refreshView();
             }, handleError);
 
             onSnapshot(collection(db, basePath, 'stock'), (s) => { 
