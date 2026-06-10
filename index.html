@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.28 (Fixed Issue Withdrawal Remark Dropdown Infinite Loading) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.28</title>
+    <!-- Version Updated: v6.29 (Moved Withdrawal Remark to Document Level) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.29</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,8 +123,8 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <!-- V6.28 UPDATE -->
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.28</span></h1>
+                    <!-- V6.29 UPDATE -->
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.29</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -553,8 +553,11 @@
         }, 8000);
 
         window.localData = window.localData || { items: [], stock: [], transactions: [], users: [], withdrawalRemarks: [] };
+        
+        // V6.29: Add issueRemarkId and issueRemarkCustom to global state to preserve document-level remark across re-renders
         window.appState = window.appState || { 
             currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
+            issueRemarkId: '', issueRemarkCustom: '',
             inventoryFilter: 'ALL', inventoryLowStockOnly: false, inventoryExpiringSoonOnly: false,
             receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
             historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: '',
@@ -953,6 +956,20 @@
 
         window.processIssueBatch = async () => { 
             if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return window.alertError('กรุณากรอกข้อมูลและ Ref Doc ให้ครบถ้วน'); 
+            
+            // V6.29: Document Level Remark Validation
+            const remarkSelect = document.getElementById('input-issue-remark');
+            if(!remarkSelect || !remarkSelect.value) return window.alertError("กรุณาเลือกหมายเหตุการเบิกสำหรับเอกสารนี้");
+            
+            let remarkText = remarkSelect.options[remarkSelect.selectedIndex].text;
+            const isCustomTrigger = remarkSelect.options[remarkSelect.selectedIndex].dataset.custom === 'true';
+
+            if (isCustomTrigger) {
+                const customInput = document.getElementById('input-issue-remark-custom');
+                remarkText = customInput ? customInput.value.trim() : '';
+                if (!remarkText) return window.alertError("กรุณาระบุข้อความสำหรับหมายเหตุ 'อื่นๆ'");
+            }
+
             try { 
                 for(let c of window.appState.issueCart) {
                     if (c.selectedLot !== 'AUTO') {
@@ -981,7 +998,8 @@
                         if(rem<=0) break; 
                         let deduct = Math.min(l.qty, rem); 
                         
-                        const combinedNote = c.remarkText ? `Ref: ${window.appState.issueRefDoc} | หมายเหตุ: ${c.remarkText}` : `Ref: ${window.appState.issueRefDoc}`;
+                        // V6.29: Apply Document Level Remark to all items
+                        const combinedNote = remarkText ? `Ref: ${window.appState.issueRefDoc} | หมายเหตุ: ${remarkText}` : `Ref: ${window.appState.issueRefDoc}`;
 
                         if(batch) {
                             const stockRef = window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, l.id);
@@ -1009,6 +1027,7 @@
                 }
 
                 window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
+                window.appState.issueRemarkId=''; window.appState.issueRemarkCustom='';
                 window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
             } catch(e){window.alertError(e.message)} 
         };
@@ -1636,19 +1655,6 @@
             const qty = parseFloat(qtyInput);
             const unit = document.getElementById('input-unit').value;
             
-            // Remark Handling
-            const remarkSelect = document.getElementById('input-issue-remark');
-            if(!remarkSelect || !remarkSelect.value) return window.alertError("กรุณาเลือกหมายเหตุการเบิก");
-            
-            let remarkText = remarkSelect.options[remarkSelect.selectedIndex].text;
-            const isCustomTrigger = remarkSelect.options[remarkSelect.selectedIndex].dataset.custom === 'true';
-
-            if (isCustomTrigger) {
-                const customInput = document.getElementById('input-issue-remark-custom');
-                remarkText = customInput ? customInput.value.trim() : '';
-                if (!remarkText) return window.alertError("กรุณาระบุข้อความสำหรับหมายเหตุ 'อื่นๆ'");
-            }
-            
             if(!itemId || !lotNo || isNaN(qty) || qty <= 0) return window.alertError("กรุณากรอกข้อมูลให้ครบถ้วน หรือไม่มีสต็อกให้เบิก");
 
             const item = window.localData.items.find(x => String(x.id) === String(itemId));
@@ -1671,14 +1677,14 @@
                 }
             }
 
-            window.appState.issueCart.push({ itemId, item, selectedLot: lotNo, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit, remarkText });
+            window.appState.issueCart.push({ itemId, item, selectedLot: lotNo, displayQty: qty, displayUnit: unit, baseQty, unit: item.unit });
             document.getElementById('input-qty').value = '';
-            // Don't reset remark dropdown to allow repetitive issuing with same remark
             window.clearSelection('issue-item');
             window.refreshView();
         };
 
         window.handleRemarkChange = (selectEl) => {
+            window.appState.issueRemarkId = selectEl.value;
             const customInput = document.getElementById('input-issue-remark-custom');
             const isCustomTrigger = selectEl.options[selectEl.selectedIndex].dataset.custom === 'true';
             
@@ -1687,13 +1693,13 @@
                 customInput.focus();
             } else {
                 customInput.classList.add('hidden');
+                window.appState.issueRemarkCustom = '';
             }
         };
 
-        window.generateRemarkOptions = () => {
+        window.generateRemarkOptions = (selectedId = '') => {
             let remarks = window.localData.withdrawalRemarks || [];
             
-            // V6.28 Fix: Fallback default options instantly to prevent infinite loading state
             if (!remarks.length) {
                 remarks = [
                     { id: 'default-1', label: 'เบิกส่งหน้าสาขา', isDefault: true },
@@ -1704,9 +1710,10 @@
                 ];
             }
             
-            let html = '<option value="" disabled selected>-- เลือกหมายเหตุ --</option>';
+            let html = `<option value="" disabled ${!selectedId ? 'selected' : ''}>-- เลือกหมายเหตุ --</option>`;
             remarks.forEach(r => {
-                html += `<option value="${r.id}" data-custom="${!!r.isCustomTrigger}">${r.label}</option>`;
+                const isSelected = r.id === selectedId ? 'selected' : '';
+                html += `<option value="${r.id}" data-custom="${!!r.isCustomTrigger}" ${isSelected}>${r.label}</option>`;
             });
             return html;
         };
@@ -2534,17 +2541,30 @@
                 <td class="p-3 text-left font-medium text-slate-700">${c.item.name||'-'}</td>
                 <td class="p-3 text-center"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-mono">${c.selectedLot === 'AUTO' ? 'อัตโนมัติ (FIFO)' : c.selectedLot}</span></td>
                 <td class="p-3 text-center"><div class="font-bold text-slate-700">${c.displayQty} ${c.displayUnit}</div><div class="text-[10px] text-slate-400 italic text-center">(= ${c.baseQty.toFixed(3)} ${c.unit})</div></td>
-                <td class="p-3 text-left"><span class="text-xs text-slate-500">${c.remarkText || '-'}</span></td>
                 <td class="p-3 text-center"><button type="button" onclick="window.removeFromIssueCart(${i})" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"><i class="fas fa-trash-can"></i></button></td>
             </tr>`).join(''); 
             
             const isAdmin = window.appState.currentUser && window.appState.currentUser.role === 'ADMIN';
 
+            const selectedRemark = (window.localData.withdrawalRemarks || []).find(r => r.id === window.appState.issueRemarkId);
+            const isCustomTrigger = selectedRemark ? !!selectedRemark.isCustomTrigger : false;
+            const customInputClass = isCustomTrigger ? '' : 'hidden';
+
             return `<div class="max-w-6xl mx-auto space-y-6 text-center">
                         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
                                 <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">Ref Doc</label><input id="input-ref-doc" class="w-full border-slate-200 border p-3 rounded-xl font-bold placeholder-slate-300 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="เช่น JOB-2024-001" value="${window.appState.issueRefDoc}" onchange="window.appState.issueRefDoc=this.value"></div>
                                 <div><label class="text-xs font-bold text-slate-500 uppercase mb-2 block text-left">วันที่เบิก</label><input type="datetime-local" id="input-issue-date" class="w-full border-slate-200 border p-3 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" value="${window.appState.issueDate}" disabled></div>
+                                <div class="relative">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="text-xs font-bold text-slate-500 uppercase block">หมายเหตุการเบิก (สำหรับเอกสารนี้)</label>
+                                        ${isAdmin ? `<button type="button" onclick="window.openManageRemarkModal()" class="text-slate-400 hover:text-primary transition-colors" title="จัดการหมายเหตุ (Admin)"><i class="fas fa-cog"></i></button>` : ''}
+                                    </div>
+                                    <select id="input-issue-remark" onchange="window.handleRemarkChange(this)" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none text-sm text-slate-700 transition-all">
+                                        ${window.generateRemarkOptions(window.appState.issueRemarkId)}
+                                    </select>
+                                    <input type="text" id="input-issue-remark-custom" oninput="window.appState.issueRemarkCustom=this.value" value="${window.appState.issueRemarkCustom || ''}" class="${customInputClass} w-full border-slate-200 border p-3 rounded-xl mt-2 text-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="โปรดระบุหมายเหตุเพิ่มเติม...">
+                                </div>
                             </div>
                         </div>
                         <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col gap-4 relative z-[90]">
@@ -2553,7 +2573,7 @@
                             </div>
                             
                             <div class="flex flex-wrap lg:flex-nowrap gap-4 items-start w-full relative z-0">
-                                <div class="w-full lg:w-48 text-left">
+                                <div class="w-full lg:flex-1 text-left">
                                     <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">Lot No.</label>
                                     <select id="input-lot-no" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none text-sm text-slate-700 transition-all">
                                         <option value="">-- เลือกสินค้าก่อน --</option>
@@ -2565,24 +2585,13 @@
                                     <input type="number" id="input-qty" class="w-full border-slate-200 border p-3 rounded-xl font-bold text-center focus:ring-2 focus:ring-primary outline-none transition-all" step="0.01">
                                 </div>
                                 
-                                <div class="w-full lg:w-28 text-left">
+                                <div class="w-full lg:w-32 text-left">
                                     <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-center">หน่วย</label>
                                     <select id="input-unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all"><option value="kg">kg</option><option value="g">g</option><option value="pcs">pcs</option><option value="ml">ml</option></select>
                                 </div>
 
-                                <div class="w-full lg:flex-1 text-left relative">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <label class="text-xs font-bold text-indigo-400 uppercase block">หมายเหตุการเบิก</label>
-                                        ${isAdmin ? `<button type="button" onclick="window.openManageRemarkModal()" class="text-slate-400 hover:text-primary transition-colors" title="จัดการหมายเหตุ (Admin)"><i class="fas fa-cog"></i></button>` : ''}
-                                    </div>
-                                    <select id="input-issue-remark" onchange="window.handleRemarkChange(this)" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none text-sm text-slate-700 transition-all">
-                                        ${window.generateRemarkOptions()}
-                                    </select>
-                                    <input type="text" id="input-issue-remark-custom" class="hidden w-full border-slate-200 border p-3 rounded-xl mt-2 text-sm focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="โปรดระบุหมายเหตุเพิ่มเติม...">
-                                </div>
-
                                 <div class="w-full lg:w-auto self-end lg:mt-[22px]">
-                                    <button type="button" onclick="window.handleAddIssueItem()" class="w-full lg:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95 whitespace-nowrap"><i class="fas fa-plus mr-1"></i> เพิ่ม</button>
+                                    <button type="button" onclick="window.handleAddIssueItem()" class="w-full lg:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95 whitespace-nowrap"><i class="fas fa-plus mr-1"></i> เพิ่มลงรายการ</button>
                                 </div>
                             </div>
                         </div>
@@ -2590,9 +2599,9 @@
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm text-left border-collapse min-w-[700px]">
                                     <thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]">
-                                        <tr><th class="p-4 text-left border-b">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">Lot No.</th><th class="border-b">จำนวนที่เบิก</th><th class="text-left border-b">หมายเหตุ</th><th class="border-b">Action</th></tr>
+                                        <tr><th class="p-4 text-left border-b">รหัส</th><th class="text-left border-b">ชื่อสินค้า</th><th class="border-b">Lot No.</th><th class="border-b">จำนวนที่เบิก</th><th class="border-b">Action</th></tr>
                                     </thead>
-                                    <tbody>${l.length?l:'<tr><td colspan="6" class="p-16 text-center text-slate-400 italic font-medium">ยังไม่มีสินค้าในรายการเบิก</td></tr>'}</tbody>
+                                    <tbody>${l.length?l:'<tr><td colspan="5" class="p-16 text-center text-slate-400 italic font-medium">ยังไม่มีสินค้าในรายการเบิก</td></tr>'}</tbody>
                                 </table>
                             </div>
                             <div class="p-6 border-t text-right bg-slate-50/30">
@@ -2836,7 +2845,6 @@
 
             onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
             
-            // V6.28: Fix withdrawalRemarks loading state issue
             onSnapshot(collection(db, basePath, 'withdrawalRemarks'), (s) => { 
                 window.localData.withdrawalRemarks = s.docs.map(d=>({id:d.id,...d.data()})); 
                 window.seedDefaultRemarks(); // Ensure seeds exist
