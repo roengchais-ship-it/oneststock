@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.26 (Added Withdrawal Remarks) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.26</title>
+    <!-- Version Updated: v6.27 (Performance & UX Optimization, Added renderQCTask) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.27</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,8 +123,8 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <!-- V6.26 UPDATE -->
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.26</span></h1>
+                    <!-- V6.27 UPDATE -->
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.27</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -237,7 +237,7 @@
             <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4"><h3 class="text-lg font-bold text-white"><i class="fas fa-bell mr-2"></i> ตั้งค่า Min Stock</h3></div>
             <div class="p-6">
                 <input type="hidden" id="modal-item-id">
-                <div class="mb-6 text-center"><label class="block text-xs font-bold text-slate-400 uppercase mb-2" id="modal-item-name">สินค้า</label><input type="number" id="modal-min-stock-input" class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-3xl font-bold text-slate-700 focus:border-orange-400 outline-none" min="0"></div>
+                <div class="mb-6 text-center"><label class="block text-xs font-bold text-slate-400 uppercase mb-2" id="modal-item-name">สินค้า</label><input type="number" id="modal-min-stock-input" step="0.01" class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-3xl font-bold text-slate-700 focus:border-orange-400 outline-none" min="0"></div>
                 <div class="flex justify-end gap-3"><button onclick="window.closeModal('min-stock-modal')" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold w-full transition-all">ยกเลิก</button><button onclick="window.saveMinStockModal()" class="px-5 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-bold shadow-lg w-full transform active:scale-95 transition-all">บันทึก</button></div>
             </div>
         </div>
@@ -254,7 +254,7 @@
                 <input type="hidden" id="edit-item-id">
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัส (แก้ไขไม่ได้)</label><input type="text" id="edit-item-code" class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-100 cursor-not-allowed" readonly></div>
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Min Stock</label><input type="number" id="edit-item-min" class="w-full border border-slate-300 rounded-xl px-3 py-2 font-bold outline-none focus:ring-2 focus:ring-indigo-500" min="0"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Min Stock</label><input type="number" step="0.01" id="edit-item-min" class="w-full border border-slate-300 rounded-xl px-3 py-2 font-bold outline-none focus:ring-2 focus:ring-indigo-500" min="0"></div>
                 </div>
                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อสินค้า</label><input type="text" id="edit-item-name" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"></div>
                 <div class="grid grid-cols-2 gap-4">
@@ -458,7 +458,7 @@
         </div>
     </div>
 
-    <!-- V6.26: MANAGE WITHDRAWAL REMARK MODAL (ADMIN ONLY) -->
+    <!-- MANAGE WITHDRAWAL REMARK MODAL (ADMIN ONLY) -->
     <div id="manage-remark-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden bg-slate-900/60 backdrop-blur-sm fade-in p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[90vh]">
             <div class="bg-gradient-to-r from-primary to-indigo-600 px-6 py-4 flex justify-between items-center shrink-0">
@@ -552,7 +552,6 @@
             }
         }, 8000);
 
-        // V6.26 Add withdrawalRemarks to localData
         window.localData = window.localData || { items: [], stock: [], transactions: [], users: [], withdrawalRemarks: [] };
         window.appState = window.appState || { 
             currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
@@ -604,7 +603,6 @@
             }
         };
 
-        // V6.26 Seed Default Remarks
         window.seedDefaultRemarks = async () => {
             if (window.localData.withdrawalRemarks.length > 0) return;
             const defaults = [
@@ -674,10 +672,11 @@
 
         window.createItem = async (d, silent=false) => { 
             try { 
+                /* Bug Fix: parsing floats for minStock instead of Int */
                 if (window.db_addDoc && window.db_collection && window.db && window.appId) {
-                    await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/items`), { code: (d.code||'').toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 }); 
+                    await window.db_addDoc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/items`), { code: (d.code||'').toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseFloat(d.minStock)||0 }); 
                 } else {
-                    window.localData.items.push({ id: Date.now().toString(), code: (d.code||'').toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseInt(d.minStock)||0 });
+                    window.localData.items.push({ id: Date.now().toString(), code: (d.code||'').toUpperCase(), name: d.name, type: d.type, unit: d.unit, minStock: parseFloat(d.minStock)||0 });
                 }
                 if(!silent) { window.alertSuccess('สำเร็จ'); window.renderView('item-master'); }
             } catch(e){ if(!silent) window.alertError(e.message); } 
@@ -725,7 +724,8 @@
         window.saveEditItem = async () => { 
             const id=document.getElementById('edit-item-id').value; 
             try { 
-                const newData = { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseInt(document.getElementById('edit-item-min').value) || 0 };
+                /* Bug Fix: Use parseFloat instead of parseInt for edit min stock */
+                const newData = { name: document.getElementById('edit-item-name').value, type: document.getElementById('edit-item-type').value, unit: document.getElementById('edit-item-unit').value, minStock: parseFloat(document.getElementById('edit-item-min').value) || 0 };
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), newData); 
                 else { const item = window.localData.items.find(x => x.id === id); if (item) Object.assign(item, newData); }
                 window.closeModal('edit-item-modal'); window.alertSuccess('แก้ไขแล้ว'); window.renderView('item-master');
@@ -744,7 +744,8 @@
         window.saveMinStockModal = async () => { 
             const id=document.getElementById('modal-item-id').value; 
             try { 
-                const val = parseInt(document.getElementById('modal-min-stock-input').value) || 0;
+                /* Bug Fix: parseFloat */
+                const val = parseFloat(document.getElementById('modal-min-stock-input').value) || 0;
                 if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/items`, id), { minStock: val }); 
                 else { const item = window.localData.items.find(x => x.id === id); if (item) item.minStock = val; }
                 window.closeModal('min-stock-modal'); window.renderView('inventory-status');
@@ -983,7 +984,6 @@
                         if(rem<=0) break; 
                         let deduct = Math.min(l.qty, rem); 
                         
-                        // V6.26: Ensure remark is saved in note
                         const combinedNote = c.remarkText ? `Ref: ${window.appState.issueRefDoc} | หมายเหตุ: ${c.remarkText}` : `Ref: ${window.appState.issueRefDoc}`;
 
                         if(batch) {
@@ -1028,7 +1028,7 @@
 
                     if (trans.type === 'RECEIVE') {
                         if (stockDoc) {
-                            const newQty = Math.max(0, stockDoc.qty - trans.qty);
+                            const newQty = Math.max(0, stockDoc.qty - Math.abs(trans.qty));
                             if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockDoc.id), { qty: newQty });
                             else stockDoc.qty = newQty;
                         }
@@ -1615,7 +1615,7 @@
                             name: (row["ชื่อสินค้า"] || row["ชื่อ"] || row["Name"] || "").toString().trim(),
                             type: (row["ประเภท"] || row["Type"] || "RM").toString().trim().toUpperCase(),
                             unit: (row["หน่วย"] || row["Unit"] || "pcs").toString().trim().toLowerCase(),
-                            minStock: parseInt(row["Min Stock"] || row["Min"] || 0)
+                            minStock: parseFloat(row["Min Stock"] || row["Min"] || 0) /* Bug Fix */
                         };
                         if (item.code && item.name) {
                             if (!window.localData.items.find(x => (x.code||'').toLowerCase() === item.code.toLowerCase())) {
@@ -1632,7 +1632,6 @@
             reader.readAsArrayBuffer(file);
         };
 
-        // V6.26 Updated: Add Remark Validation & Capture
         window.handleAddIssueItem = () => {
             const itemId = document.getElementById('hidden-item-id-issue-item').value;
             const lotNo = document.getElementById('input-lot-no').value; 
@@ -1682,7 +1681,6 @@
             window.refreshView();
         };
 
-        // V6.26 Withdrawal Remark Handlers
         window.handleRemarkChange = (selectEl) => {
             const customInput = document.getElementById('input-issue-remark-custom');
             const isCustomTrigger = selectEl.options[selectEl.selectedIndex].dataset.custom === 'true';
@@ -1846,7 +1844,27 @@
 
         window.refreshView = () => {
             if(window.appState && window.appState.currentView) {
+                /* Bug Fix: Preserve Input Focus during Realtime Refresh */
+                const activeEl = document.activeElement;
+                const activeId = activeEl && activeEl.id ? activeEl.id : null;
+                let selectionStart = null, selectionEnd = null;
+                if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                    try { selectionStart = activeEl.selectionStart; selectionEnd = activeEl.selectionEnd; } catch(e){}
+                }
+
                 window.renderView(window.appState.currentView);
+
+                if (activeId) {
+                    setTimeout(() => {
+                        const newEl = document.getElementById(activeId);
+                        if (newEl) {
+                            newEl.focus();
+                            if ((newEl.tagName === 'INPUT' || newEl.tagName === 'TEXTAREA') && selectionStart !== null) {
+                                try { newEl.setSelectionRange(selectionStart, selectionEnd); } catch(e){}
+                            }
+                        }
+                    }, 0);
+                }
             }
         };
 
@@ -2118,7 +2136,6 @@
                     if (t.status === 'VOIDED' || (t.type !== 'RECEIVE' && t.type !== 'ISSUE')) return;
                     
                     const item = window.localData.items.find(i => String(i.id) === String(t.itemId));
-                    // Handle case where item might be deleted but transaction remains
                     const tType = item ? item.type : 'RM';
                     
                     const tDate = new Date(t.timestamp);
@@ -2177,9 +2194,6 @@
             `;
         }
 
-        // renderItemMaster, renderInventoryStatus, renderReceiveForm unchanged except for their place in the flow 
-        // V6.26 UPDATE - Modified renderIssueForm below
-        
         function renderItemMaster() {
             const can = window.checkPerm('manage_item');
             const typeClasses = { 'RM': 'bg-emerald-100 text-emerald-600', 'FG': 'bg-indigo-100 text-indigo-600', 'PKG': 'bg-amber-100 text-amber-600' };
@@ -2195,7 +2209,7 @@
                                 <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">ประเภท</label><select name="type" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all"><option value="RM">RM</option><option value="FG">FG</option><option value="PKG">PKG</option></select></div>
                                 <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยหลัก</label><select name="unit" class="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all"><option value="kg">kg</option><option value="pcs">pcs</option><option value="set">set</option><option value="g">g</option><option value="ml">ml</option></select></div>
                             </div>
-                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">Min Stock</label><input type="number" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" value="0"></div>
+                            <div><label class="text-xs font-bold text-slate-500 uppercase block mb-1">Min Stock</label><input type="number" step="0.01" name="minStock" class="w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all" value="0"></div>
                             <button class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all transform active:scale-95">บันทึกสินค้า</button>
                         </form>
                     </div>
@@ -2506,11 +2520,9 @@
             </div>`; 
         }
 
-        // V6.26 UPDATE - Modified Issue Form to include Remark Dropdown
         function renderIssueForm() { 
             const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset()); window.appState.issueDate=now.toISOString().slice(0,16); 
             
-            // Add Remark Column to cart table
             const l=window.appState.issueCart.map((c,i)=>`<tr class="border-b transition-colors hover:bg-slate-50/30 text-center text-sm font-medium">
                 <td class="p-3 font-bold text-primary text-left font-mono">${c.item.code||'-'}</td>
                 <td class="p-3 text-left font-medium text-slate-700">${c.item.name||'-'}</td>
@@ -2530,12 +2542,10 @@
                             </div>
                         </div>
                         <div class="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col gap-4 relative z-[90]">
-                            <!-- Row 1: Search -->
                             <div class="w-full text-left relative z-[90]">
                                 <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">ระบุสินค้า</label>${window.renderSearchableItemInput('issue-item')}
                             </div>
                             
-                            <!-- Row 2: Form Inputs (Lot, Qty, Unit, Remark) -->
                             <div class="flex flex-wrap lg:flex-nowrap gap-4 items-start w-full relative z-0">
                                 <div class="w-full lg:w-48 text-left">
                                     <label class="text-xs font-bold text-indigo-400 uppercase mb-2 block text-left">Lot No.</label>
@@ -2554,7 +2564,6 @@
                                     <select id="input-unit" class="w-full border-slate-200 border p-3 rounded-xl bg-white focus:ring-2 focus:ring-primary outline-none transition-all"><option value="kg">kg</option><option value="g">g</option><option value="pcs">pcs</option><option value="ml">ml</option></select>
                                 </div>
 
-                                <!-- V6.26 REMARK SECTION -->
                                 <div class="w-full lg:flex-1 text-left relative">
                                     <div class="flex justify-between items-center mb-2">
                                         <label class="text-xs font-bold text-indigo-400 uppercase block">หมายเหตุการเบิก</label>
@@ -2585,6 +2594,67 @@
                             </div>
                         </div>
                     </div>`; 
+        }
+
+        /* Bug Fix: Added renderQCTask to prevent ReferenceError and enable QC workflow */
+        function renderQCTask() {
+            const currentTab = window.appState.qcTab || 'PENDING';
+            const pendingStocks = window.localData.stock.filter(s => s.qty > 0 && (s.status === 'WAIT_QC' || s.status === 'HOLD')).sort((a,b) => b.timestamp - a.timestamp);
+
+            const pendingHTML = pendingStocks.map(s => {
+                const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
+                if (!item) return '';
+                return `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4 text-left">
+                    <div class="flex justify-between items-start border-b border-slate-100 pb-3 mb-3">
+                        <div>
+                            <span class="text-xs font-bold text-slate-400 font-mono block mb-1">Lot: ${s.lotNo}</span>
+                            <h4 class="text-lg font-bold text-slate-800">${item.code} - ${item.name}</h4>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-bold text-slate-500 block">รอตรวจ</span>
+                            <span class="text-xl font-bold text-amber-500">${s.qty.toLocaleString()} ${item.unit}</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">สุ่มตรวจ (${item.unit})</label>
+                            <input type="number" id="qc-sample-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" min="0" max="${s.qty}" step="0.01" value="0">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">โซน</label>
+                            <input type="text" id="qc-loc-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.location !== '-' ? s.location : ''}" placeholder="ระบุโซน">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ภาชนะ</label>
+                            <input type="text" id="qc-container-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.container !== '-' ? s.container : ''}" placeholder="ระบุภาชนะ">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">อุณหภูมิ</label>
+                            <input type="text" id="qc-temp-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.temperature !== '-' ? s.temperature : ''}" placeholder="ระบุอุณหภูมิ">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">หมายเหตุ</label>
+                            <input type="text" id="qc-remark-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" placeholder="-">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50 justify-end">
+                        <button onclick="window.executeQC('${s.id}', 'REJECT')" class="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-times-circle mr-1"></i> ไม่ผ่าน</button>
+                        <button onclick="window.executeQC('${s.id}', 'HOLD')" class="px-4 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-pause-circle mr-1"></i> กักกัน (Hold)</button>
+                        <button onclick="window.executeQC('${s.id}', 'PASS')" class="px-6 py-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-200 rounded-lg font-bold text-xs transition-colors transform active:scale-95"><i class="fas fa-check-circle mr-1"></i> ผ่าน (PASS)</button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `
+            <div class="max-w-5xl mx-auto text-center">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-200 pb-4">
+                    <h2 class="text-2xl font-bold text-slate-800 flex items-center"><i class="fas fa-microscope mr-3 text-amber-500"></i> ตรวจสอบคุณภาพ (QC)</h2>
+                </div>
+                <div class="fade-in">
+                    ${pendingStocks.length > 0 ? pendingHTML : '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center"><i class="fas fa-check-circle text-5xl text-emerald-400 mb-4 block"></i><h4 class="text-xl font-bold text-slate-700">ไม่มีงานรอตรวจ</h4><p class="text-slate-400 mt-2">สินค้าทุก Lot ได้รับการตรวจสอบเรียบร้อยแล้ว</p></div>'}
+                </div>
+            </div>`;
         }
 
         function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm font-medium"><td class="p-4 text-left font-mono text-slate-600">${u.username}</td><td class="p-4 text-left font-bold text-slate-700">${u.name}</td><td class="p-4 text-center"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4 text-center"><button type="button" onclick="window.deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto text-center"><div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button type="button" onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[500px]"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left border-b">Username</th><th class="p-4 text-left border-b">ชื่อพนักงาน</th><th class="border-b">ตำแหน่ง (Role)</th><th class="border-b">Action</th></tr></thead><tbody>${list}</tbody></table></div></div></div>`; }
@@ -2761,7 +2831,7 @@
 
             onSnapshot(collection(db, basePath, 'items'), (s) => { window.localData.items = s.docs.map(d=>({id:d.id,...d.data()})); if(window.refreshView) window.refreshView(); }, handleError);
             
-            // V6.26: Add withdrawalRemarks listener
+            // V6.27: Add withdrawalRemarks listener
             onSnapshot(collection(db, basePath, 'withdrawalRemarks'), (s) => { 
                 window.localData.withdrawalRemarks = s.docs.map(d=>({id:d.id,...d.data()})); 
                 window.seedDefaultRemarks(); // Ensure seeds exist
