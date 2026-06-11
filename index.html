@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.32 (Universal Report Access & Audit Logs) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.32</title>
+    <!-- Version Updated: v6.33 (Daily Stock Movement Report) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.33</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,7 +123,7 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.32</span></h1>
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.33</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -561,10 +561,11 @@
             receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
             historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: '',
             reportTab: 'aging',
-            reportWithdrawalStartDate: todayStr, reportWithdrawalEndDate: todayStr, reportWithdrawalSearch: ''
+            reportWithdrawalStartDate: todayStr, reportWithdrawalEndDate: todayStr, reportWithdrawalSearch: '',
+            reportMovementStartDate: todayStr, reportMovementEndDate: todayStr, reportMovementSearch: '' // ADDED FOR MOVEMENT REPORT
         };
 
-        // V6.32 Update: Report Universal Access for all roles
+        // V6.33 Update: Report Universal Access for all roles + New Report
         const menuConfig = {
             ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
             STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}],
@@ -1898,8 +1899,83 @@
             return parsedData;
         };
 
+        // --- NEW DATA PARSING HELPER FOR MOVEMENT REPORT ---
+        window.parseMovementData = function(startDate, endDate, searchTxt) {
+            let trans = window.localData.transactions.filter(t => t.status !== 'VOIDED' && !['EXPORT_REPORT', 'PRINT_REPORT'].includes(t.type));
+
+            const sDate = new Date(startDate); sDate.setHours(0,0,0,0);
+            const eDate = new Date(endDate); eDate.setHours(23,59,59,999);
+
+            trans = trans.filter(t => {
+                if (t.timestamp) {
+                    return t.timestamp >= sDate.getTime() && t.timestamp <= eDate.getTime();
+                }
+                return true;
+            });
+
+            let parsedData = trans.map(t => {
+                let ref = '-', remark = '-';
+                if (t.note) {
+                    const parts = t.note.split(' | ');
+                    parts.forEach(p => {
+                        if (p.startsWith('Ref:')) ref = p.replace('Ref:', '').trim();
+                        else if (p.startsWith('หมายเหตุ:')) remark = p.replace('หมายเหตุ:', '').trim();
+                        else if (remark === '-') remark = p.trim(); // fallback
+                    });
+                }
+
+                const itemParts = (t.item || '').split(' - ');
+                const code = itemParts[0] || '-';
+                const name = itemParts.slice(1).join(' - ') || '-';
+                const stock = window.localData.stock.find(s => s.id === t.stockId);
+                const loc = stock && stock.location !== '-' ? stock.location : '-';
+
+                let moveType = t.type;
+                let moveTypeTh = t.type;
+                if (t.type === 'RECEIVE') moveTypeTh = 'รับเข้า';
+                else if (t.type === 'ISSUE') moveTypeTh = 'เบิกออก';
+                else if (t.type === 'ADJUST') moveTypeTh = 'ปรับสต๊อก';
+                else if (t.type.startsWith('QC_')) moveTypeTh = 'ตรวจสอบ QC';
+
+                const qtyIn = t.qty > 0 ? t.qty : 0;
+                const qtyOut = t.qty < 0 ? Math.abs(t.qty) : 0;
+
+                return {
+                    ...t,
+                    dateStr: t.date || '-',
+                    refDoc: ref,
+                    remark: remark,
+                    code: code,
+                    name: name,
+                    moveType: moveType,
+                    moveTypeTh: moveTypeTh,
+                    qtyIn: qtyIn,
+                    qtyOut: qtyOut,
+                    balance: stock ? stock.qty : 0, // Current Lot Balance at viewing time
+                    sourceLoc: loc,
+                    dest: remark !== '-' ? remark : '-'
+                };
+            });
+
+            if (searchTxt) {
+                const s = searchTxt.toLowerCase();
+                parsedData = parsedData.filter(d =>
+                    (d.code||'').toLowerCase().includes(s) ||
+                    (d.name||'').toLowerCase().includes(s) ||
+                    (d.refDoc||'').toLowerCase().includes(s) ||
+                    (d.lot||'').toLowerCase().includes(s) ||
+                    (d.remark||'').toLowerCase().includes(s) ||
+                    (d.actionBy||'').toLowerCase().includes(s) ||
+                    (d.moveTypeTh||'').toLowerCase().includes(s)
+                );
+            }
+
+            // Newest first
+            parsedData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            return parsedData;
+        };
+
         // --- EXPORT/PRINT HANDLERS ---
-        // V6.32 Update: Explicitly allowed for all roles via Report Access
         window.exportWithdrawalExcel = async function() {
             const startDate = document.getElementById('withdrawal-start-date').value;
             const endDate = document.getElementById('withdrawal-end-date').value;
@@ -1908,7 +1984,6 @@
             const data = window.parseWithdrawalData(startDate, endDate, searchTxt);
             if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับ Export');
 
-            // Audit log record (Utilizing logTrans to avoid needing new firestore rules)
             await window.logTrans('EXPORT_REPORT', 'SYSTEM', '-', 0, '-', `Export Report Excel: ${startDate} to ${endDate}`, null, null);
 
             const exportData = [
@@ -1928,7 +2003,6 @@
             window.alertSuccess('ส่งออกไฟล์ Excel สำเร็จ และบันทึกประวัติ (Audit Log) เรียบร้อยแล้ว');
         };
 
-        // V6.32 Update: Explicitly allowed for all roles via Report Access
         window.printWithdrawalReport = async function() {
             const startDate = document.getElementById('withdrawal-start-date').value;
             const endDate = document.getElementById('withdrawal-end-date').value;
@@ -1937,7 +2011,6 @@
             const data = window.parseWithdrawalData(startDate, endDate, searchTxt);
             if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับพิมพ์');
 
-            // Audit log record
             await window.logTrans('PRINT_REPORT', 'SYSTEM', '-', 0, '-', `Print PDF Report: ${startDate} to ${endDate}`, null, null);
 
             const printDate = new Date().toLocaleString('th-TH');
@@ -1986,6 +2059,94 @@
             pw.document.close();
             setTimeout(() => { pw.print(); pw.close(); }, 500);
             window.alertSuccess('บันทึกประวัติการพิมพ์ลงระบบ (Audit Log) เรียบร้อยแล้ว');
+        };
+
+        // NEW EXPORT/PRINT FOR MOVEMENT REPORT
+        window.exportMovementExcel = async function() {
+            const startDate = document.getElementById('movement-start-date').value;
+            const endDate = document.getElementById('movement-end-date').value;
+            const searchTxt = document.getElementById('movement-search').value;
+            
+            const data = window.parseMovementData(startDate, endDate, searchTxt);
+            if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับ Export');
+
+            await window.logTrans('EXPORT_REPORT', 'SYSTEM', '-', 0, '-', `Export Movement Report Excel: ${startDate} to ${endDate}`, null, null);
+
+            const exportData = [
+                ["วันที่", "เวลา", "REF DOC", "Transaction Type", "RM Code", "RM Name", "CAS Number", "LOT NO.", "Movement Type", "Qty In", "Qty Out", "Balance", "Unit", "Warehouse", "Source", "Destination", "ผู้ทำรายการ", "หมายเหตุ"]
+            ];
+
+            data.forEach(d => {
+                const dateParts = d.dateStr.split(' ');
+                exportData.push([
+                    dateParts[0] || '-', dateParts[1] || '-', d.refDoc, d.type, d.code, d.name, "-", d.lot, d.moveTypeTh, d.qtyIn, d.qtyOut, d.balance, d.unit, d.sourceLoc, d.sourceLoc, d.dest, d.actionBy, d.remark
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Daily Stock Movement");
+            XLSX.writeFile(wb, `Movement_Report_${startDate}_to_${endDate}.xlsx`);
+            window.alertSuccess('ส่งออกไฟล์ Excel สำเร็จ');
+        };
+
+        window.printMovementReport = async function() {
+            const startDate = document.getElementById('movement-start-date').value;
+            const endDate = document.getElementById('movement-end-date').value;
+            const searchTxt = document.getElementById('movement-search').value;
+            
+            const data = window.parseMovementData(startDate, endDate, searchTxt);
+            if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับพิมพ์');
+
+            await window.logTrans('PRINT_REPORT', 'SYSTEM', '-', 0, '-', `Print PDF Movement Report: ${startDate} to ${endDate}`, null, null);
+
+            const printDate = new Date().toLocaleString('th-TH');
+            const userName = window.appState.currentUser.name;
+
+            const html = `
+                <div style="font-family: 'Sarabun', sans-serif; padding: 10px; font-size: 11px;">
+                    <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px;">
+                        <h1 style="margin: 0; font-size: 18px;">รายงานการเคลื่อนไหวรายวัน (Daily Stock Movement Report)</h1>
+                        <p style="margin: 5px 0;">ข้อมูลระหว่างวันที่: ${startDate} ถึง ${endDate}</p>
+                        <p style="margin: 5px 0; font-size: 10px;">พิมพ์โดย: ${userName} | เวลาพิมพ์: ${printDate}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <thead>
+                            <tr style="background-color: #f5f5f5;">
+                                <th style="border: 1px solid #000; padding: 4px;">วันที่/เวลา</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Ref Doc</th>
+                                <th style="border: 1px solid #000; padding: 4px;">รหัสสินค้า</th>
+                                <th style="border: 1px solid #000; padding: 4px; text-align: left;">ชื่อสินค้า</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Lot No.</th>
+                                <th style="border: 1px solid #000; padding: 4px;">ประเภท</th>
+                                <th style="border: 1px solid #000; padding: 4px;">รับเข้า (In)</th>
+                                <th style="border: 1px solid #000; padding: 4px;">เบิกออก (Out)</th>
+                                <th style="border: 1px solid #000; padding: 4px;">คงเหลือล่าสุด</th>
+                                <th style="border: 1px solid #000; padding: 4px;">ผู้ทำรายการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>${data.map(d => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.dateStr}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.refDoc}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.code}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: left;">${d.name}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.lot}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.moveTypeTh}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: right;">${d.qtyIn > 0 ? d.qtyIn.toLocaleString() : '-'}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: right;">${d.qtyOut > 0 ? d.qtyOut.toLocaleString() : '-'}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: right;">${d.balance.toLocaleString()} ${d.unit}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.actionBy}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+                
+            const pw = window.open('', '_blank');
+            if(!pw) return window.alertError("กรุณาอนุญาต Pop-ups เพื่อดูใบพิมพ์");
+            pw.document.write(`<html><head><title>Daily Stock Movement Report</title><style>@page { size: A4 landscape; margin: 0.5cm; } body { font-family: 'Sarabun', sans-serif; }</style></head><body>${html}</body></html>`);
+            pw.document.close();
+            setTimeout(() => { pw.print(); pw.close(); }, 500);
         };
     </script>
 
@@ -2109,7 +2270,6 @@
                 </div>`;
         }
 
-        // Additive Patch: Adding the Missing History Renderer
         function renderHistory() {
             const list = window.localData.transactions.map(t => {
                 const badgeColor = t.type.includes('REC') ? 'bg-emerald-100 text-emerald-700' :
@@ -2181,6 +2341,7 @@
                     <button onclick="window.switchReportTab('expiry')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'expiry' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-calendar-times mr-2"></i> สินค้าใกล้หมดอายุ</button>
                     <button onclick="window.switchReportTab('turnover')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'turnover' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-chart-line mr-2"></i> สรุปความเคลื่อนไหว</button>
                     <button onclick="window.switchReportTab('withdrawal')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'withdrawal' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-truck-loading mr-2"></i> รายงานเบิกจ่าย (Daily)</button>
+                    <button onclick="window.switchReportTab('movement')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'movement' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-exchange-alt mr-2"></i> ความเคลื่อนไหวรายวัน</button>
                 </div>
             `;
 
@@ -2558,6 +2719,115 @@
                 `;
             }
 
+            // 7. NEW: DAILY STOCK MOVEMENT REPORT
+            else if (currentTab === 'movement') {
+                const sDate = window.appState.reportMovementStartDate;
+                const eDate = window.appState.reportMovementEndDate;
+                const searchTxt = window.appState.reportMovementSearch;
+
+                const data = window.parseMovementData(sDate, eDate, searchTxt);
+
+                // Summaries
+                const totalMoves = data.length;
+                const uniqueSKUs = new Set(data.map(d => d.code)).size;
+                const uniqueLots = new Set(data.map(d => d.lot)).size;
+                const totalIn = data.reduce((sum, d) => sum + d.qtyIn, 0);
+                const totalOut = data.reduce((sum, d) => sum + d.qtyOut, 0);
+
+                const trs = data.map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-center text-xs">
+                        <td class="py-3 px-3 text-slate-500 whitespace-nowrap">${d.dateStr}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-slate-700">${d.refDoc}</td>
+                        <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[9px] font-bold ${d.qtyIn > 0 ? 'bg-emerald-50 text-emerald-600' : (d.qtyOut > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600')}">${d.moveTypeTh}</span></td>
+                        <td class="py-3 px-3 font-mono font-bold text-indigo-600 text-left">${d.code}</td>
+                        <td class="py-3 px-3 text-slate-700 text-left truncate max-w-[150px]" title="${d.name}">${d.name}</td>
+                        <td class="py-3 px-3 font-mono text-slate-500">${d.lot}</td>
+                        <td class="py-3 px-3 font-bold text-emerald-600 text-right">${d.qtyIn > 0 ? '+' + d.qtyIn.toLocaleString() : '-'}</td>
+                        <td class="py-3 px-3 font-bold text-red-500 text-right">${d.qtyOut > 0 ? '-' + d.qtyOut.toLocaleString() : '-'}</td>
+                        <td class="py-3 px-3 font-bold text-slate-600 text-right">${d.balance.toLocaleString()}</td>
+                        <td class="py-3 px-3 uppercase text-slate-500">${d.unit}</td>
+                        <td class="py-3 px-3 text-slate-600 truncate max-w-[100px]">${d.sourceLoc}</td>
+                        <td class="py-3 px-3 text-slate-500">${d.actionBy}</td>
+                        <td class="py-3 px-3 text-slate-600 text-left truncate max-w-[120px]" title="${d.remark}">${d.remark}</td>
+                    </tr>
+                `).join('');
+
+                contentHTML = `
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
+                        <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+                            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ตั้งแต่วันที่</label>
+                                    <input type="date" id="movement-start-date" value="${sDate}" onchange="window.appState.reportMovementStartDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm focus:border-primary outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ถึงวันที่</label>
+                                    <input type="date" id="movement-end-date" value="${eDate}" onchange="window.appState.reportMovementEndDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm focus:border-primary outline-none">
+                                </div>
+                                <div class="flex-1 min-w-[200px]">
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ค้นหา (Ref, Code, Name, Remark)</label>
+                                    <div class="relative">
+                                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                        <input type="text" id="movement-search" value="${searchTxt}" oninput="window.appState.reportMovementSearch=this.value; window.refreshView();" placeholder="พิมพ์เพื่อกรองข้อมูล..." class="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:border-primary outline-none">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button onclick="window.printMovementReport()" class="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-bold text-sm transition-colors"><i class="fas fa-print mr-2"></i> Print / PDF</button>
+                                <button onclick="window.exportMovementExcel()" class="flex-1 md:flex-none px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-sm transition-colors"><i class="fas fa-file-excel mr-2"></i> Excel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center text-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-1">จำนวนรายการเคลื่อนไหว</span>
+                            <span class="text-2xl font-bold text-slate-800">${totalMoves}</span>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center text-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-1">จำนวน SKU / LOT</span>
+                            <span class="text-xl font-bold text-indigo-600">${uniqueSKUs} <span class="text-sm text-slate-400 font-normal">/ ${uniqueLots}</span></span>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-emerald-100 bg-emerald-50/30 shadow-sm flex flex-col justify-center text-center">
+                            <span class="text-[10px] font-bold text-emerald-600 uppercase mb-1">ยอดรับเข้ารวม</span>
+                            <span class="text-xl font-bold text-emerald-600">+${totalIn.toLocaleString(undefined, {maximumFractionDigits:2})}</span>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-red-100 bg-red-50/30 shadow-sm flex flex-col justify-center text-center">
+                            <span class="text-[10px] font-bold text-red-600 uppercase mb-1">ยอดเบิกออกรวม</span>
+                            <span class="text-xl font-bold text-red-600">-${totalOut.toLocaleString(undefined, {maximumFractionDigits:2})}</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800"><i class="fas fa-list-ul mr-2 text-primary"></i> รายการเคลื่อนไหวรายวันของสินค้า (Movement Log)</h3>
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
+                            <table class="w-full text-sm text-left whitespace-nowrap min-w-[1200px]">
+                                <thead class="bg-white z-10 sticky top-0 border-b text-center text-[10px] font-bold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="py-3 px-3 border-b bg-white">วันที่ / เวลา</th>
+                                        <th class="py-3 px-3 border-b bg-white">REF DOC</th>
+                                        <th class="py-3 px-3 border-b bg-white">ประเภท</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">RM Code</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">RM Name</th>
+                                        <th class="py-3 px-3 border-b bg-white">LOT NO.</th>
+                                        <th class="py-3 px-3 border-b text-right bg-white text-emerald-600">รับเข้า (In)</th>
+                                        <th class="py-3 px-3 border-b text-right bg-white text-red-600">เบิกออก (Out)</th>
+                                        <th class="py-3 px-3 border-b text-right bg-white text-slate-600">คงเหลือล่าสุด</th>
+                                        <th class="py-3 px-3 border-b bg-white">หน่วย</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">Location</th>
+                                        <th class="py-3 px-3 border-b bg-white">ผู้ทำรายการ</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">หมายเหตุ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${trs.length ? trs : `<tr><td colspan="13" class="text-center py-16 text-slate-400 italic">ไม่มีข้อมูลการเคลื่อนไหวในช่วงวันที่เลือก</td></tr>`}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="max-w-7xl mx-auto">
                     <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center"><i class="fas fa-file-invoice mr-3 text-primary"></i> ศูนย์รวมรายงาน (Reports Center)</h2>
@@ -2893,6 +3163,66 @@
             </div>`; 
         }
 
+        function renderQCTask() {
+            const currentTab = window.appState.qcTab || 'PENDING';
+            const pendingStocks = window.localData.stock.filter(s => s.qty > 0 && (s.status === 'WAIT_QC' || s.status === 'HOLD')).sort((a,b) => b.timestamp - a.timestamp);
+
+            const pendingHTML = pendingStocks.map(s => {
+                const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
+                if (!item) return '';
+                return `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4 text-left">
+                    <div class="flex justify-between items-start border-b border-slate-100 pb-3 mb-3">
+                        <div>
+                            <span class="text-xs font-bold text-slate-400 font-mono block mb-1">Lot: ${s.lotNo}</span>
+                            <h4 class="text-lg font-bold text-slate-800">${item.code} - ${item.name}</h4>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-bold text-slate-500 block">รอตรวจ</span>
+                            <span class="text-xl font-bold text-amber-500">${s.qty.toLocaleString()} ${item.unit}</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">สุ่มตรวจ (${item.unit})</label>
+                            <input type="number" id="qc-sample-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" min="0" max="${s.qty}" step="0.01" value="0">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">โซน</label>
+                            <input type="text" id="qc-loc-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.location !== '-' ? s.location : ''}" placeholder="ระบุโซน">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ภาชนะ</label>
+                            <input type="text" id="qc-container-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.container !== '-' ? s.container : ''}" placeholder="ระบุภาชนะ">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">อุณหภูมิ</label>
+                            <input type="text" id="qc-temp-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.temperature !== '-' ? s.temperature : ''}" placeholder="ระบุอุณหภูมิ">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">หมายเหตุ</label>
+                            <input type="text" id="qc-remark-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" placeholder="-">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50 justify-end">
+                        <button onclick="window.executeQC('${s.id}', 'REJECT')" class="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-times-circle mr-1"></i> ไม่ผ่าน</button>
+                        <button onclick="window.executeQC('${s.id}', 'HOLD')" class="px-4 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-pause-circle mr-1"></i> กักกัน (Hold)</button>
+                        <button onclick="window.executeQC('${s.id}', 'PASS')" class="px-6 py-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-200 rounded-lg font-bold text-xs transition-colors transform active:scale-95"><i class="fas fa-check-circle mr-1"></i> ผ่าน (PASS)</button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `
+            <div class="max-w-5xl mx-auto text-center">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-200 pb-4">
+                    <h2 class="text-2xl font-bold text-slate-800 flex items-center"><i class="fas fa-microscope mr-3 text-amber-500"></i> ตรวจสอบคุณภาพ (QC)</h2>
+                </div>
+                <div class="fade-in">
+                    ${pendingStocks.length > 0 ? pendingHTML : '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center"><i class="fas fa-check-circle text-5xl text-emerald-400 mb-4 block"></i><h4 class="text-xl font-bold text-slate-700">ไม่มีงานรอตรวจ</h4><p class="text-slate-400 mt-2">สินค้าทุก Lot ได้รับการตรวจสอบเรียบร้อยแล้ว</p></div>'}
+                </div>
+            </div>`;
+        }
+
         function renderIssueForm() { 
             const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset()); window.appState.issueDate=now.toISOString().slice(0,16); 
             
@@ -2969,66 +3299,6 @@
                             </div>
                         </div>
                     </div>`; 
-        }
-
-        function renderQCTask() {
-            const currentTab = window.appState.qcTab || 'PENDING';
-            const pendingStocks = window.localData.stock.filter(s => s.qty > 0 && (s.status === 'WAIT_QC' || s.status === 'HOLD')).sort((a,b) => b.timestamp - a.timestamp);
-
-            const pendingHTML = pendingStocks.map(s => {
-                const item = window.localData.items.find(i => String(i.id) === String(s.itemId));
-                if (!item) return '';
-                return `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4 text-left">
-                    <div class="flex justify-between items-start border-b border-slate-100 pb-3 mb-3">
-                        <div>
-                            <span class="text-xs font-bold text-slate-400 font-mono block mb-1">Lot: ${s.lotNo}</span>
-                            <h4 class="text-lg font-bold text-slate-800">${item.code} - ${item.name}</h4>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-sm font-bold text-slate-500 block">รอตรวจ</span>
-                            <span class="text-xl font-bold text-amber-500">${s.qty.toLocaleString()} ${item.unit}</span>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                        <div class="lg:col-span-1">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">สุ่มตรวจ (${item.unit})</label>
-                            <input type="number" id="qc-sample-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" min="0" max="${s.qty}" step="0.01" value="0">
-                        </div>
-                        <div class="lg:col-span-1">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">โซน</label>
-                            <input type="text" id="qc-loc-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.location !== '-' ? s.location : ''}" placeholder="ระบุโซน">
-                        </div>
-                        <div class="lg:col-span-1">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ภาชนะ</label>
-                            <input type="text" id="qc-container-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.container !== '-' ? s.container : ''}" placeholder="ระบุภาชนะ">
-                        </div>
-                        <div class="lg:col-span-1">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">อุณหภูมิ</label>
-                            <input type="text" id="qc-temp-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-emerald-400 outline-none" value="${s.temperature !== '-' ? s.temperature : ''}" placeholder="ระบุอุณหภูมิ">
-                        </div>
-                        <div class="lg:col-span-1">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">หมายเหตุ</label>
-                            <input type="text" id="qc-remark-${s.id}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:border-amber-400 outline-none" placeholder="-">
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50 justify-end">
-                        <button onclick="window.executeQC('${s.id}', 'REJECT')" class="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-times-circle mr-1"></i> ไม่ผ่าน</button>
-                        <button onclick="window.executeQC('${s.id}', 'HOLD')" class="px-4 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-bold text-xs transition-colors"><i class="fas fa-pause-circle mr-1"></i> กักกัน (Hold)</button>
-                        <button onclick="window.executeQC('${s.id}', 'PASS')" class="px-6 py-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-200 rounded-lg font-bold text-xs transition-colors transform active:scale-95"><i class="fas fa-check-circle mr-1"></i> ผ่าน (PASS)</button>
-                    </div>
-                </div>`;
-            }).join('');
-
-            return `
-            <div class="max-w-5xl mx-auto text-center">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-200 pb-4">
-                    <h2 class="text-2xl font-bold text-slate-800 flex items-center"><i class="fas fa-microscope mr-3 text-amber-500"></i> ตรวจสอบคุณภาพ (QC)</h2>
-                </div>
-                <div class="fade-in">
-                    ${pendingStocks.length > 0 ? pendingHTML : '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center"><i class="fas fa-check-circle text-5xl text-emerald-400 mb-4 block"></i><h4 class="text-xl font-bold text-slate-700">ไม่มีงานรอตรวจ</h4><p class="text-slate-400 mt-2">สินค้าทุก Lot ได้รับการตรวจสอบเรียบร้อยแล้ว</p></div>'}
-                </div>
-            </div>`;
         }
 
         function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm font-medium"><td class="p-4 text-left font-mono text-slate-600">${u.username}</td><td class="p-4 text-left font-bold text-slate-700">${u.name}</td><td class="p-4 text-center"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4 text-center"><button type="button" onclick="window.deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto text-center"><div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button type="button" onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[500px]"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left border-b">Username</th><th class="p-4 text-left border-b">ชื่อพนักงาน</th><th class="border-b">ตำแหน่ง (Role)</th><th class="border-b">Action</th></tr></thead><tbody>${list}</tbody></table></div></div></div>`; }
