@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.29 (Moved Withdrawal Remark to Document Level) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.29</title>
+    <!-- Version Updated: v6.30 (Added Daily Withdrawal Report) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.30</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SheetJS for Excel Import -->
+    <!-- SheetJS for Excel Import/Export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- JsBarcode สำหรับสร้างบาร์โค้ด -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
@@ -123,8 +123,8 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <!-- V6.29 UPDATE -->
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.29</span></h1>
+                    <!-- V6.30 UPDATE -->
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.30</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -554,14 +554,16 @@
 
         window.localData = window.localData || { items: [], stock: [], transactions: [], users: [], withdrawalRemarks: [] };
         
-        // V6.29: Add issueRemarkId and issueRemarkCustom to global state to preserve document-level remark across re-renders
+        // V6.30: Add Daily Withdrawal Report states
+        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
         window.appState = window.appState || { 
             currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
             issueRemarkId: '', issueRemarkCustom: '',
             inventoryFilter: 'ALL', inventoryLowStockOnly: false, inventoryExpiringSoonOnly: false,
             receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
             historyFilter: 'ALL', historyFilterMonth: '', historyFilterLot: '',
-            reportTab: 'aging'
+            reportTab: 'aging',
+            reportWithdrawalStartDate: todayStr, reportWithdrawalEndDate: todayStr, reportWithdrawalSearch: ''
         };
 
         const menuConfig = {
@@ -957,7 +959,7 @@
         window.processIssueBatch = async () => { 
             if(!window.appState.issueCart.length || !window.appState.issueRefDoc) return window.alertError('กรุณากรอกข้อมูลและ Ref Doc ให้ครบถ้วน'); 
             
-            // V6.29: Document Level Remark Validation
+            // Document Level Remark Validation
             const remarkSelect = document.getElementById('input-issue-remark');
             if(!remarkSelect || !remarkSelect.value) return window.alertError("กรุณาเลือกหมายเหตุการเบิกสำหรับเอกสารนี้");
             
@@ -998,7 +1000,7 @@
                         if(rem<=0) break; 
                         let deduct = Math.min(l.qty, rem); 
                         
-                        // V6.29: Apply Document Level Remark to all items
+                        // Apply Document Level Remark to all items
                         const combinedNote = remarkText ? `Ref: ${window.appState.issueRefDoc} | หมายเหตุ: ${remarkText}` : `Ref: ${window.appState.issueRefDoc}`;
 
                         if(batch) {
@@ -1830,6 +1832,158 @@
             };
             reader.readAsArrayBuffer(file);
         };
+        
+        // --- DATA PARSING HELPERS FOR REPORT ---
+        window.parseWithdrawalData = function(startDate, endDate, searchTxt) {
+            // Get all issue transactions that are not voided
+            let issues = window.localData.transactions.filter(t => t.type === 'ISSUE' && t.status !== 'VOIDED');
+            
+            // Filter by date range (using t.date format: DD/MM/YYYY HH:mm:ss)
+            const sDate = new Date(startDate); sDate.setHours(0,0,0,0);
+            const eDate = new Date(endDate); eDate.setHours(23,59,59,999);
+            
+            issues = issues.filter(t => {
+                const dateParts = (t.date||'').split(' ')[0].split('/'); // DD/MM/YYYY
+                if (dateParts.length === 3) {
+                    // JS Date is YYYY, MM-1, DD
+                    const tDate = new Date(dateParts[2] - 543, parseInt(dateParts[1])-1, dateParts[0]); // Handle Buddhist Year if present, assuming system outputs AD year but fallback 
+                    // Better to rely on timestamp
+                    if (t.timestamp) {
+                        return t.timestamp >= sDate.getTime() && t.timestamp <= eDate.getTime();
+                    }
+                }
+                return true;
+            });
+
+            // Parse individual records
+            let parsedData = issues.map(t => {
+                let ref = '-', remark = '-';
+                if (t.note) {
+                    const parts = t.note.split(' | ');
+                    parts.forEach(p => {
+                        if (p.startsWith('Ref:')) ref = p.replace('Ref:', '').trim();
+                        if (p.startsWith('หมายเหตุ:')) remark = p.replace('หมายเหตุ:', '').trim();
+                    });
+                }
+                const itemParts = (t.item || '').split(' - ');
+                const code = itemParts[0] || '-';
+                const name = itemParts.slice(1).join(' - ') || '-';
+                const stock = window.localData.stock.find(s => s.id === t.stockId);
+                const loc = stock && stock.location !== '-' ? stock.location : 'Staging';
+
+                return { 
+                    ...t, 
+                    refDoc: ref, 
+                    remark: remark, 
+                    code: code, 
+                    name: name, 
+                    absQty: Math.abs(t.qty), 
+                    sourceLoc: loc,
+                    dest: remark !== '-' ? remark : '-' // Using remark as proxy for destination
+                };
+            });
+            
+            // Search Filter
+            if (searchTxt) {
+                const s = searchTxt.toLowerCase();
+                parsedData = parsedData.filter(d => 
+                    (d.code||'').toLowerCase().includes(s) || 
+                    (d.name||'').toLowerCase().includes(s) ||
+                    (d.refDoc||'').toLowerCase().includes(s) ||
+                    (d.lot||'').toLowerCase().includes(s) ||
+                    (d.remark||'').toLowerCase().includes(s) ||
+                    (d.actionBy||'').toLowerCase().includes(s)
+                );
+            }
+            
+            return parsedData;
+        };
+
+        // --- EXPORT/PRINT HANDLERS ---
+        window.exportWithdrawalExcel = function() {
+            const isAdmin = window.appState.currentUser.role === 'ADMIN';
+            if(!isAdmin) return window.alertError('สิทธิ์เฉพาะ Admin เท่านั้น');
+            
+            const startDate = document.getElementById('withdrawal-start-date').value;
+            const endDate = document.getElementById('withdrawal-end-date').value;
+            const searchTxt = document.getElementById('withdrawal-search').value;
+            
+            const data = window.parseWithdrawalData(startDate, endDate, searchTxt);
+            if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับ Export');
+
+            const exportData = [
+                ["วันที่เบิก", "REF DOC", "RM Code", "RM Name", "CAS Number", "LOT NO.", "จำนวนที่เบิก", "หน่วย", "หมายเหตุการเบิก", "ผู้เบิก", "สถานะ", "QC/COA/MSDS", "คลังต้นทาง", "ปลายทาง/สาขา"]
+            ];
+
+            data.forEach(d => {
+                exportData.push([
+                    d.date, d.refDoc, d.code, d.name, "-", d.lot, d.absQty, d.unit, d.remark, d.actionBy, d.status, "-", d.sourceLoc, d.dest
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Daily Withdrawal");
+            XLSX.writeFile(wb, `Withdrawal_Report_${startDate}_to_${endDate}.xlsx`);
+        };
+
+        window.printWithdrawalReport = function() {
+            const isAdmin = window.appState.currentUser.role === 'ADMIN';
+            if(!isAdmin) return window.alertError('สิทธิ์เฉพาะ Admin เท่านั้น');
+
+            const startDate = document.getElementById('withdrawal-start-date').value;
+            const endDate = document.getElementById('withdrawal-end-date').value;
+            const searchTxt = document.getElementById('withdrawal-search').value;
+            
+            const data = window.parseWithdrawalData(startDate, endDate, searchTxt);
+            if (!data.length) return window.alertError('ไม่มีข้อมูลสำหรับพิมพ์');
+
+            const printDate = new Date().toLocaleString('th-TH');
+            const adminName = window.appState.currentUser.name;
+
+            const html = `
+                <div style="font-family: 'Sarabun', sans-serif; padding: 10px; font-size: 11px;">
+                    <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px;">
+                        <h1 style="margin: 0; font-size: 18px;">รายงานการเบิกจ่ายประจำวัน (Daily Withdrawal Report)</h1>
+                        <p style="margin: 5px 0;">ข้อมูลระหว่างวันที่: ${startDate} ถึง ${endDate}</p>
+                        <p style="margin: 5px 0; font-size: 10px;">พิมพ์โดย: ${adminName} | เวลาพิมพ์: ${printDate}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <thead>
+                            <tr style="background-color: #f5f5f5;">
+                                <th style="border: 1px solid #000; padding: 4px;">เวลาเบิก</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Ref Doc</th>
+                                <th style="border: 1px solid #000; padding: 4px;">รหัสสินค้า</th>
+                                <th style="border: 1px solid #000; padding: 4px; text-align: left;">ชื่อสินค้า</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Lot No.</th>
+                                <th style="border: 1px solid #000; padding: 4px;">จำนวน</th>
+                                <th style="border: 1px solid #000; padding: 4px;">หน่วย</th>
+                                <th style="border: 1px solid #000; padding: 4px;">ผู้เบิก</th>
+                                <th style="border: 1px solid #000; padding: 4px; text-align: left;">หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody>${data.map(d => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${(d.date||'').split(' ')[1] || '-'}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.refDoc}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.code}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: left;">${d.name}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.lot}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: right;">${d.absQty.toLocaleString()}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.unit}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: center;">${d.actionBy}</td>
+                                <td style="border: 1px solid #000; padding: 4px; text-align: left;">${d.remark}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+                
+            const pw = window.open('', '_blank');
+            if(!pw) return window.alertError("กรุณาอนุญาต Pop-ups เพื่อดูใบพิมพ์");
+            pw.document.write(`<html><head><title>Daily Withdrawal Report</title><style>@page { size: A4 landscape; margin: 0.5cm; } body { font-family: 'Sarabun', sans-serif; }</style></head><body>${html}</body></html>`);
+            pw.document.close();
+            setTimeout(() => { pw.print(); pw.close(); }, 500);
+        };
     </script>
 
     <!-- SCRIPT 2: RENDERERS (VIEWS) -->
@@ -1948,6 +2102,7 @@
                     <button onclick="window.switchReportTab('replenish')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'replenish' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-cart-arrow-down mr-2"></i> สั่งซื้อเติมสต็อก (Min Stock)</button>
                     <button onclick="window.switchReportTab('expiry')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'expiry' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-calendar-times mr-2"></i> สินค้าใกล้หมดอายุ</button>
                     <button onclick="window.switchReportTab('turnover')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'turnover' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-chart-line mr-2"></i> สรุปความเคลื่อนไหว</button>
+                    <button onclick="window.switchReportTab('withdrawal')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'withdrawal' ? 'bg-primary text-white border-primary shadow-lg shadow-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-truck-loading mr-2"></i> รายงานเบิกจ่าย (Daily)</button>
                 </div>
             `;
 
@@ -2192,6 +2347,134 @@
                         <div class="overflow-auto max-h-[600px]">
                             <table class="w-full text-sm text-center border-collapse"><thead class="bg-white z-10 sticky top-0 border-b text-[11px] font-bold text-slate-500 uppercase"><tr><th class="py-3 px-4 border-b bg-white">เดือน (YYYY-MM)</th><th class="py-3 px-4 border-b bg-white">ประเภทสินค้า</th><th class="py-3 px-4 border-b text-emerald-600 bg-emerald-50/90 backdrop-blur">ยอดรับเข้า (In)</th><th class="py-3 px-4 border-b text-red-600 bg-red-50/90 backdrop-blur">ยอดเบิกออก (Out)</th><th class="py-3 px-4 border-b bg-slate-50/90 backdrop-blur">ยอดสุทธิ (Net)</th></tr></thead>
                             <tbody>${trs.length ? trs : '<tr><td colspan="5" class="text-center py-20 text-slate-400 italic">ไม่มีข้อมูลการเคลื่อนไหว</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 6. DAILY WITHDRAWAL REPORT (NEW)
+            else if (currentTab === 'withdrawal') {
+                const sDate = window.appState.reportWithdrawalStartDate;
+                const eDate = window.appState.reportWithdrawalEndDate;
+                const searchTxt = window.appState.reportWithdrawalSearch;
+                const isAdmin = window.appState.currentUser && window.appState.currentUser.role === 'ADMIN';
+
+                const parsedData = window.parseWithdrawalData(sDate, eDate, searchTxt);
+
+                // Summary Calculation
+                const totalTrans = parsedData.length;
+                const uniqueSKUs = new Set(parsedData.map(d => d.code)).size;
+                const uniqueLots = new Set(parsedData.map(d => d.lot)).size;
+                
+                // Group by unit
+                const qtyByUnit = {};
+                parsedData.forEach(d => {
+                    if(!qtyByUnit[d.unit]) qtyByUnit[d.unit] = 0;
+                    qtyByUnit[d.unit] += d.absQty;
+                });
+                const unitSummaryHtml = Object.entries(qtyByUnit).map(([u, q]) => `<span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold mr-1">${q.toLocaleString()} ${u}</span>`).join('') || '-';
+
+                // Top Remarks
+                const remarksCount = {};
+                parsedData.forEach(d => {
+                    if(!remarksCount[d.remark]) remarksCount[d.remark] = 0;
+                    remarksCount[d.remark]++;
+                });
+                const topRemarksHtml = Object.entries(remarksCount)
+                    .sort((a,b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([rmk, cnt]) => `<div class="text-xs mb-1 flex justify-between"><span class="truncate pr-2" title="${rmk}">${rmk}</span><span class="font-bold">${cnt} รายการ</span></div>`)
+                    .join('') || '<div class="text-xs text-slate-400 text-center mt-2">ไม่มีข้อมูล</div>';
+
+                const trs = parsedData.map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-center text-xs">
+                        <td class="py-3 px-3 text-slate-500 whitespace-nowrap">${(d.date||'').split(' ')[1] || '-'}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-slate-700">${d.refDoc}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-indigo-600 text-left">${d.code}</td>
+                        <td class="py-3 px-3 text-slate-700 text-left truncate max-w-[150px]" title="${d.name}">${d.name}</td>
+                        <td class="py-3 px-3 font-mono text-slate-500">${d.lot}</td>
+                        <td class="py-3 px-3 font-bold text-red-500 text-right">${d.absQty.toLocaleString()}</td>
+                        <td class="py-3 px-3 uppercase text-slate-500">${d.unit}</td>
+                        <td class="py-3 px-3 text-slate-600 text-left truncate max-w-[120px]" title="${d.remark}">${d.remark}</td>
+                        <td class="py-3 px-3 text-slate-500">${d.actionBy}</td>
+                        <td class="py-3 px-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[9px] font-bold">สำเร็จ</span></td>
+                        <td class="py-3 px-3 text-slate-400">-</td>
+                        <td class="py-3 px-3 text-slate-600 truncate max-w-[100px]">${d.sourceLoc}</td>
+                        <td class="py-3 px-3 text-slate-600 truncate max-w-[100px]">${d.dest}</td>
+                    </tr>
+                `).join('');
+
+                contentHTML = `
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
+                        <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+                            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ตั้งแต่วันที่</label>
+                                    <input type="date" id="withdrawal-start-date" value="${sDate}" onchange="window.appState.reportWithdrawalStartDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm focus:border-primary outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ถึงวันที่</label>
+                                    <input type="date" id="withdrawal-end-date" value="${eDate}" onchange="window.appState.reportWithdrawalEndDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm focus:border-primary outline-none">
+                                </div>
+                                <div class="flex-1 min-w-[200px]">
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ค้นหา (Ref, Code, Name, Remark)</label>
+                                    <div class="relative">
+                                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                        <input type="text" id="withdrawal-search" value="${searchTxt}" oninput="window.appState.reportWithdrawalSearch=this.value; window.refreshView();" placeholder="พิมพ์เพื่อกรองข้อมูล..." class="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:border-primary outline-none">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button onclick="window.printWithdrawalReport()" class="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-bold text-sm transition-colors ${!isAdmin?'opacity-50 cursor-not-allowed':''}" ${!isAdmin?'disabled title="Admin Only"':''}><i class="fas fa-print mr-2"></i> Print / PDF</button>
+                                <button onclick="window.exportWithdrawalExcel()" class="flex-1 md:flex-none px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-sm transition-colors ${!isAdmin?'opacity-50 cursor-not-allowed':''}" ${!isAdmin?'disabled title="Admin Only"':''}><i class="fas fa-file-excel mr-2"></i> Excel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-1">จำนวนรายการเบิก</span>
+                            <span class="text-2xl font-bold text-slate-800">${totalTrans}</span>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-1">จำนวน SKU / LOT</span>
+                            <span class="text-xl font-bold text-indigo-600">${uniqueSKUs} <span class="text-sm text-slate-400 font-normal">/ ${uniqueLots}</span></span>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-2">ยอดเบิกรวมแยกหน่วย</span>
+                            <div class="flex flex-wrap gap-1">${unitSummaryHtml}</div>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-2 border-b pb-1">Top Remarks</span>
+                            <div class="flex-1 overflow-y-auto custom-scrollbar">${topRemarksHtml}</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800"><i class="fas fa-list-ul mr-2 text-primary"></i> รายการเบิกจ่ายสินค้า (Issues)</h3>
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
+                            <table class="w-full text-sm text-left whitespace-nowrap min-w-[1200px]">
+                                <thead class="bg-white z-10 sticky top-0 border-b text-center text-[10px] font-bold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="py-3 px-3 border-b bg-white">เวลาเบิก</th>
+                                        <th class="py-3 px-3 border-b bg-white">REF DOC</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">RM Code</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">RM Name</th>
+                                        <th class="py-3 px-3 border-b bg-white">LOT NO.</th>
+                                        <th class="py-3 px-3 border-b text-right bg-white">จำนวนที่เบิก</th>
+                                        <th class="py-3 px-3 border-b bg-white">หน่วย</th>
+                                        <th class="py-3 px-3 border-b text-left bg-white">หมายเหตุการเบิก</th>
+                                        <th class="py-3 px-3 border-b bg-white">ผู้เบิก</th>
+                                        <th class="py-3 px-3 border-b bg-white">สถานะ</th>
+                                        <th class="py-3 px-3 border-b bg-white">QC/COA/MSDS</th>
+                                        <th class="py-3 px-3 border-b bg-white text-left">คลังต้นทาง</th>
+                                        <th class="py-3 px-3 border-b bg-white text-left">ปลายทาง/สาขา</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${trs.length ? trs : `<tr><td colspan="13" class="text-center py-16 text-slate-400 italic">ไม่มีข้อมูลการเบิกจ่ายในช่วงวันที่เลือก</td></tr>`}</tbody>
                             </table>
                         </div>
                     </div>
