@@ -445,6 +445,14 @@
                     <h4 id="print-barcode-code" class="font-mono font-bold text-indigo-600 text-lg"></h4>
                     <p id="print-barcode-name" class="text-sm text-slate-600 truncate"></p>
                 </div>
+                
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">เลือก Lot (ไม่บังคับ)</label>
+                    <select id="print-barcode-lot" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-purple-400 outline-none text-center font-mono">
+                        <option value="">-- พิมพ์แค่รหัสสินค้า --</option>
+                    </select>
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">จำนวนดวงที่ต้องการพิมพ์</label>
                     <input type="number" id="print-barcode-qty" class="w-full border-2 border-slate-200 rounded-xl px-3 py-3 text-center text-2xl font-bold text-slate-700 focus:border-indigo-400 outline-none" min="1" value="1">
