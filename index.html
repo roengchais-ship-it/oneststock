@@ -3304,7 +3304,6 @@
         function renderUserList() { const list=window.localData.users.map(u=>`<tr class="border-b hover:bg-slate-50 transition-colors text-center text-sm font-medium"><td class="p-4 text-left font-mono text-slate-600">${u.username}</td><td class="p-4 text-left font-bold text-slate-700">${u.name}</td><td class="p-4 text-center"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100">${u.role}</span></td><td class="p-4 text-center"><button type="button" onclick="window.deleteUser('${u.id}')" class="text-slate-300 hover:text-red-500 p-2 rounded-full transition-colors"><i class="fas fa-trash-can"></i></button></td></tr>`).join(''); return `<div class="max-w-4xl mx-auto text-center"><div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><h3 class="text-xl font-bold text-slate-800"><i class="fas fa-users-gear text-primary mr-2"></i> จัดการผู้ใช้งาน</h3><button type="button" onclick="window.openUserManageModal()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all transform active:scale-95"><i class="fas fa-plus mr-2"></i> เพิ่มผู้ใช้ใหม่</button></div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse min-w-[500px]"><thead class="bg-slate-50/50 border-b text-center text-slate-500 font-bold uppercase text-[11px]"><tr><th class="p-4 text-left border-b">Username</th><th class="p-4 text-left border-b">ชื่อพนักงาน</th><th class="border-b">ตำแหน่ง (Role)</th><th class="border-b">Action</th></tr></thead><tbody>${list}</tbody></table></div></div></div>`; }
     </script>
 
-    <!-- SCRIPT 4: FIREBASE INIT (MODULE) -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
@@ -3419,5 +3418,441 @@
 
         initApp();
     </script>
-</body>
-</html>
+
+    <script>
+        // 1. Extend App State for New Reports
+        const todayForReport = new Date().toLocaleDateString('en-CA');
+        Object.assign(window.appState, {
+            reportTraceLot: '',
+            reportStockCardItemId: '',
+            reportStockCardStartDate: todayForReport,
+            reportStockCardEndDate: todayForReport,
+            reportQCStartDate: todayForReport,
+            reportQCEndDate: todayForReport,
+            reportAuditStartDate: todayForReport,
+            reportAuditEndDate: todayForReport
+        });
+
+        // 2. Helper: Calculate Running Balance for Stock Card
+        window.calculateStockCard = function(itemId, startDate, endDate) {
+            const sDate = new Date(startDate); sDate.setHours(0,0,0,0);
+            const eDate = new Date(endDate); eDate.setHours(23,59,59,999);
+            
+            let trans = window.localData.transactions.filter(t => 
+                String(t.itemId) === String(itemId) && 
+                t.status !== 'VOIDED' && 
+                !['EXPORT_REPORT', 'PRINT_REPORT', 'QC_PASS', 'QC_HOLD', 'QC_FAIL'].includes(t.type)
+            ).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0)); // Ascending
+
+            let runningBalance = 0;
+            let broughtForward = 0;
+            const ledger = [];
+
+            trans.forEach(t => {
+                const isBefore = (t.timestamp || 0) < sDate.getTime();
+                const isInRange = (t.timestamp || 0) >= sDate.getTime() && (t.timestamp || 0) <= eDate.getTime();
+                
+                // Calc Balance
+                runningBalance += parseFloat(t.qty || 0);
+
+                if (isBefore) {
+                    broughtForward = runningBalance;
+                } else if (isInRange) {
+                    let ref = '-', remark = '-';
+                    if (t.note) {
+                        const parts = t.note.split(' | ');
+                        parts.forEach(p => {
+                            if (p.startsWith('Ref:')) ref = p.replace('Ref:', '').trim();
+                            else if (p.startsWith('หมายเหตุ:')) remark = p.replace('หมายเหตุ:', '').trim();
+                            else if (remark === '-') remark = p.trim();
+                        });
+                    }
+
+                    ledger.push({
+                        ...t,
+                        dateStr: t.date || '-',
+                        refDoc: ref,
+                        remark: remark,
+                        qtyIn: t.qty > 0 ? t.qty : 0,
+                        qtyOut: t.qty < 0 ? Math.abs(t.qty) : 0,
+                        balance: runningBalance
+                    });
+                }
+            });
+
+            return { broughtForward, ledger: ledger.reverse() }; // Newest first for UI
+        };
+
+        // 3. Override renderReports to inject Admin Reports
+        const originalRenderReports = window.renderReports;
+        
+        window.renderReports = function() {
+            const isAdmin = window.appState.currentUser && window.appState.currentUser.role === 'ADMIN';
+            const currentTab = window.appState.reportTab || 'aging';
+            const now = Date.now();
+
+            // If trying to access admin tab directly without permission, fallback to aging
+            const adminTabs = ['traceability', 'stockcard', 'qcanalytics', 'auditlog'];
+            if (adminTabs.includes(currentTab) && !isAdmin) {
+                window.appState.reportTab = 'aging';
+                return originalRenderReports.apply(this);
+            }
+
+            // --- INJECT ADMIN TABS ---
+            const adminTabButtons = isAdmin ? `
+                <div class="w-full h-px bg-slate-200 my-4 relative"><span class="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-[#f1f5f9] px-4 text-xs font-bold text-slate-400 uppercase"><i class="fas fa-lock text-amber-500 mr-1"></i> Admin Exclusive Reports</span></div>
+                <div class="flex flex-wrap justify-center gap-2 mb-6">
+                    <button onclick="window.switchReportTab('traceability')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'traceability' ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-search-location mr-2"></i> Lot Traceability</button>
+                    <button onclick="window.switchReportTab('stockcard')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'stockcard' ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-clipboard-list mr-2"></i> Stock Card (Bin Card)</button>
+                    <button onclick="window.switchReportTab('qcanalytics')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'qcanalytics' ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-chart-pie mr-2"></i> QC Defect Analytics</button>
+                    <button onclick="window.switchReportTab('auditlog')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${currentTab === 'auditlog' ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i class="fas fa-shield-alt mr-2"></i> Audit Trail (Adjust/Void)</button>
+                </div>
+            ` : '';
+
+            // Generate base HTML using original function, then we will modify it
+            let baseHtml = originalRenderReports.apply(this);
+            
+            // Inject the buttons into the base HTML
+            baseHtml = baseHtml.replace('</div>\n            <div class="fade-in">', `</div>${adminTabButtons}<div class="fade-in">`);
+
+            let adminContentHTML = '';
+
+            // ---------------------------------------------------------
+            // REPORT: LOT TRACEABILITY
+            // ---------------------------------------------------------
+            if (currentTab === 'traceability' && isAdmin) {
+                const searchLot = window.appState.reportTraceLot.trim();
+                let traceHTML = '';
+                
+                if (searchLot) {
+                    const traceTrans = window.localData.transactions.filter(t => t.lot === searchLot && t.status !== 'VOIDED').sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+                    
+                    if (traceTrans.length > 0) {
+                        const itemParts = (traceTrans[0].item || '').split(' - ');
+                        traceHTML = `
+                            <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-6 text-left flex justify-between items-center">
+                                <div>
+                                    <span class="text-xs font-bold text-indigo-500 uppercase block mb-1">Target Lot</span>
+                                    <h4 class="text-xl font-bold font-mono text-slate-800">${searchLot}</h4>
+                                    <p class="text-sm font-bold text-slate-600">${itemParts[0]} - ${itemParts.slice(1).join(' - ')}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold text-slate-500 uppercase block mb-1">Total Activities</span>
+                                    <h4 class="text-2xl font-bold text-indigo-600">${traceTrans.length}</h4>
+                                </div>
+                            </div>
+                            <div class="relative border-l-2 border-indigo-200 ml-4 space-y-6 pb-4">
+                        `;
+                        
+                        traceTrans.forEach((t, index) => {
+                            let icon = 'fa-circle', color = 'text-slate-400', bg = 'bg-slate-100';
+                            if (t.type === 'RECEIVE') { icon = 'fa-dolly'; color = 'text-emerald-500'; bg = 'bg-emerald-50 border-emerald-200'; }
+                            else if (t.type === 'ISSUE') { icon = 'fa-truck-fast'; color = 'text-indigo-500'; bg = 'bg-indigo-50 border-indigo-200'; }
+                            else if (t.type.includes('QC_')) { icon = 'fa-microscope'; color = 'text-amber-500'; bg = 'bg-amber-50 border-amber-200'; }
+                            else if (t.type === 'ADJUST') { icon = 'fa-wrench'; color = 'text-orange-500'; bg = 'bg-orange-50 border-orange-200'; }
+
+                            traceHTML += `
+                                <div class="relative pl-6 text-left">
+                                    <div class="absolute -left-[17px] top-1 w-8 h-8 rounded-full bg-white border-2 border-indigo-200 flex items-center justify-center shadow-sm">
+                                        <i class="fas ${icon} ${color} text-xs"></i>
+                                    </div>
+                                    <div class="p-4 rounded-xl border ${bg} shadow-sm">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <span class="font-bold text-slate-800">${t.type}</span>
+                                            <span class="text-xs font-mono text-slate-500">${t.date || '-'}</span>
+                                        </div>
+                                        <div class="text-sm text-slate-600 mb-2">Action by: <span class="font-bold text-slate-800">${t.actionBy || '-'}</span></div>
+                                        <div class="text-sm font-medium text-slate-700 bg-white/50 p-2 rounded border border-white/60">
+                                            ${t.qty !== 0 ? `<span class="font-bold ${t.qty > 0 ? 'text-emerald-600' : 'text-red-500'}">${t.qty > 0 ? '+' : ''}${t.qty} ${t.unit}</span> | ` : ''} 
+                                            ${t.note || '-'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        traceHTML += `</div>`;
+                    } else {
+                        traceHTML = `<div class="p-10 text-center text-slate-400 italic">ไม่พบประวัติการทำรายการสำหรับ Lot: ${searchLot}</div>`;
+                    }
+                }
+
+                adminContentHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-4xl mx-auto">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4 text-left"><i class="fas fa-search-location text-primary mr-2"></i> Lot Traceability (ตรวจสอบย้อนกลับ)</h3>
+                        <div class="flex gap-2 mb-6">
+                            <input type="text" id="trace-lot-input" value="${searchLot}" placeholder="กรอก Lot No. ที่ต้องการตรวจสอบย้อนกลับ (Exact Match)..." class="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none font-mono">
+                            <button onclick="window.appState.reportTraceLot = document.getElementById('trace-lot-input').value; window.refreshView();" class="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all"><i class="fas fa-search"></i> ค้นหา</button>
+                        </div>
+                        ${searchLot ? traceHTML : '<div class="p-10 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">กรุณาระบุ Lot No. เพื่อเริ่มการตรวจสอบย้อนกลับ (Forward/Backward Traceability)</div>'}
+                    </div>
+                `;
+            }
+
+            // ---------------------------------------------------------
+            // REPORT: STOCK CARD (BIN CARD)
+            // ---------------------------------------------------------
+            else if (currentTab === 'stockcard' && isAdmin) {
+                const sDate = window.appState.reportStockCardStartDate;
+                const eDate = window.appState.reportStockCardEndDate;
+                const itemId = window.appState.reportStockCardItemId;
+
+                let cardHTML = '<div class="p-16 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">กรุณาเลือกสินค้าจากช่องค้นหาด้านบน เพื่อแสดง Stock Card</div>';
+                
+                if (itemId) {
+                    const item = window.localData.items.find(i => String(i.id) === String(itemId));
+                    if (item) {
+                        const { broughtForward, ledger } = window.calculateStockCard(itemId, sDate, eDate);
+                        
+                        const rows = ledger.map(l => `
+                            <tr class="border-b hover:bg-slate-50 text-center text-xs">
+                                <td class="py-3 px-3 text-slate-500 whitespace-nowrap">${l.dateStr}</td>
+                                <td class="py-3 px-3 font-mono font-bold text-slate-700 text-left">${l.refDoc}</td>
+                                <td class="py-3 px-3 font-mono text-slate-500">${l.lot}</td>
+                                <td class="py-3 px-3 font-bold text-emerald-600 text-right">${l.qtyIn > 0 ? '+' + l.qtyIn.toLocaleString() : '-'}</td>
+                                <td class="py-3 px-3 font-bold text-red-500 text-right">${l.qtyOut > 0 ? '-' + l.qtyOut.toLocaleString() : '-'}</td>
+                                <td class="py-3 px-3 font-bold text-indigo-600 text-right bg-indigo-50/30">${l.balance.toLocaleString()}</td>
+                                <td class="py-3 px-3 uppercase text-slate-500">${l.unit}</td>
+                                <td class="py-3 px-3 text-slate-600 text-left truncate max-w-[200px]" title="${l.remark}">${l.remark}</td>
+                            </tr>
+                        `).join('');
+
+                        cardHTML = `
+                            <div class="mb-4 flex flex-wrap justify-between items-end gap-4 border-b border-slate-200 pb-4">
+                                <div class="text-left">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase">ข้อมูลสินค้า (Item Info)</span>
+                                    <h4 class="text-xl font-bold text-slate-800 font-mono">${item.code}</h4>
+                                    <p class="text-sm font-bold text-indigo-600">${item.name}</p>
+                                </div>
+                                <div class="text-right bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">ยอดยกมา (Brought Forward)</span>
+                                    <span class="text-lg font-bold text-slate-700">${broughtForward.toLocaleString()} ${item.unit}</span>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-sm text-left border-collapse min-w-[800px]">
+                                    <thead class="bg-slate-100 border-b text-center text-slate-600 font-bold uppercase text-[10px]">
+                                        <tr>
+                                            <th class="py-3 px-3 border-b">วันที่/เวลา</th>
+                                            <th class="py-3 px-3 border-b text-left">Ref Doc</th>
+                                            <th class="py-3 px-3 border-b">Lot No.</th>
+                                            <th class="py-3 px-3 border-b text-right">รับเข้า (In)</th>
+                                            <th class="py-3 px-3 border-b text-right">เบิกออก (Out)</th>
+                                            <th class="py-3 px-3 border-b text-right">คงเหลือ (Balance)</th>
+                                            <th class="py-3 px-3 border-b">หน่วย</th>
+                                            <th class="py-3 px-3 border-b text-left">รายละเอียด/หมายเหตุ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${rows.length ? rows : `<tr><td colspan="8" class="text-center py-10 text-slate-400 italic">ไม่มีความเคลื่อนไหวในช่วงวันที่ระบุ</td></tr>`}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }
+                }
+
+                adminContentHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-6xl mx-auto text-center relative z-10">
+                        <h3 class="text-lg font-bold text-slate-800 mb-6 text-left"><i class="fas fa-clipboard-list text-primary mr-2"></i> Stock Card / Bin Card (บัญชีคุมยอดสินค้า)</h3>
+                        
+                        <div class="flex flex-col md:flex-row gap-4 items-end justify-between mb-6 relative z-50">
+                            <div class="flex-1 w-full text-left relative">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ค้นหาสินค้า</label>
+                                ${window.renderSearchableItemInput('stockcard-item')}
+                            </div>
+                            <div class="w-full md:w-auto">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1 text-left">ตั้งแต่วันที่</label>
+                                <input type="date" value="${sDate}" onchange="window.appState.reportStockCardStartDate=this.value; window.refreshView();" class="w-full md:w-auto border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                            </div>
+                            <div class="w-full md:w-auto">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1 text-left">ถึงวันที่</label>
+                                <input type="date" value="${eDate}" onchange="window.appState.reportStockCardEndDate=this.value; window.refreshView();" class="w-full md:w-auto border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                            </div>
+                            <button onclick="window.appState.reportStockCardItemId = document.getElementById('hidden-item-id-stockcard-item').value; window.refreshView();" class="w-full md:w-auto bg-slate-800 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-dark transition-all transform active:scale-95 whitespace-nowrap"><i class="fas fa-sync-alt mr-2"></i> โหลดข้อมูล</button>
+                        </div>
+
+                        ${cardHTML}
+                    </div>
+                `;
+            }
+
+            // ---------------------------------------------------------
+            // REPORT: QC ANALYTICS
+            // ---------------------------------------------------------
+            else if (currentTab === 'qcanalytics' && isAdmin) {
+                const sDate = window.appState.reportQCStartDate;
+                const eDate = window.appState.reportQCEndDate;
+                const startTimestamp = new Date(sDate).setHours(0,0,0,0);
+                const endTimestamp = new Date(eDate).setHours(23,59,59,999);
+
+                const qcTrans = window.localData.transactions.filter(t => 
+                    t.status !== 'VOIDED' && 
+                    t.type.startsWith('QC_') && 
+                    (t.timestamp || 0) >= startTimestamp && 
+                    (t.timestamp || 0) <= endTimestamp
+                );
+
+                let passCount = 0, rejectCount = 0, holdCount = 0;
+                const defectReasons = {};
+                const topRejectedItems = {};
+
+                qcTrans.forEach(t => {
+                    if (t.type === 'QC_PASS') passCount++;
+                    else if (t.type === 'QC_FAIL' || t.type === 'QC_REJECT') {
+                        rejectCount++;
+                        topRejectedItems[t.item] = (topRejectedItems[t.item] || 0) + 1;
+                        
+                        // Extract reason from note
+                        let reason = "ไม่ระบุสาเหตุ";
+                        if (t.note) {
+                            const parts = t.note.split(' | ');
+                            parts.forEach(p => { if (p.startsWith('หมายเหตุ:')) reason = p.replace('หมายเหตุ:', '').trim() || reason; });
+                        }
+                        defectReasons[reason] = (defectReasons[reason] || 0) + 1;
+                    }
+                    else if (t.type === 'QC_HOLD') holdCount++;
+                });
+
+                const totalQC = passCount + rejectCount + holdCount;
+                const rejectRate = totalQC > 0 ? ((rejectCount / totalQC) * 100).toFixed(1) : 0;
+
+                const defectRows = Object.entries(defectReasons).sort((a,b) => b[1] - a[1]).map(d => `
+                    <tr class="border-b hover:bg-slate-50 text-sm">
+                        <td class="py-3 px-4 text-left font-medium text-slate-700">${d[0]}</td>
+                        <td class="py-3 px-4 text-center font-bold text-red-500">${d[1]}</td>
+                        <td class="py-3 px-4 text-center text-slate-500">${((d[1]/rejectCount)*100).toFixed(1)}%</td>
+                    </tr>
+                `).join('');
+
+                adminContentHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-6xl mx-auto text-center">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                            <h3 class="text-lg font-bold text-slate-800 text-left"><i class="fas fa-chart-pie text-red-500 mr-2"></i> QC Rejection & Defect Analysis</h3>
+                            <div class="flex gap-2 items-center mt-4 md:mt-0">
+                                <input type="date" value="${sDate}" onchange="window.appState.reportQCStartDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm outline-none">
+                                <span class="text-slate-400">-</span>
+                                <input type="date" value="${eDate}" onchange="window.appState.reportQCEndDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">ยอดตรวจทั้งหมด</span>
+                                <span class="text-2xl font-bold text-slate-800">${totalQC}</span>
+                            </div>
+                            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                                <span class="text-[10px] font-bold text-emerald-600 uppercase block mb-1">ผ่าน (PASS)</span>
+                                <span class="text-2xl font-bold text-emerald-600">${passCount}</span>
+                            </div>
+                            <div class="bg-red-50 p-4 rounded-xl border border-red-200">
+                                <span class="text-[10px] font-bold text-red-600 uppercase block mb-1">ไม่ผ่าน (REJECT)</span>
+                                <span class="text-2xl font-bold text-red-600">${rejectCount}</span>
+                            </div>
+                            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 relative overflow-hidden">
+                                <span class="text-[10px] font-bold text-amber-700 uppercase block mb-1">Reject Rate</span>
+                                <span class="text-2xl font-bold ${rejectRate > 5 ? 'text-red-600 animate-pulse' : 'text-amber-600'}">${rejectRate}%</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="border border-slate-200 rounded-xl overflow-hidden">
+                                <div class="bg-slate-50 py-3 px-4 border-b border-slate-200 text-left font-bold text-slate-700 text-sm"><i class="fas fa-list-ol mr-2 text-slate-400"></i> วิเคราะห์สาเหตุของเสีย (Defect Reasons)</div>
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-white border-b text-[10px] text-slate-500 uppercase text-center">
+                                        <tr><th class="py-2 px-4 text-left">สาเหตุ (Remark)</th><th class="py-2 px-4">จำนวนครั้ง</th><th class="py-2 px-4">% ของของเสีย</th></tr>
+                                    </thead>
+                                    <tbody>${defectRows || '<tr><td colspan="3" class="text-center py-8 text-slate-400 italic">ไม่มีข้อมูล Reject ในช่วงเวลานี้</td></tr>'}</tbody>
+                                </table>
+                            </div>
+                            <div class="border border-slate-200 rounded-xl overflow-hidden">
+                                <div class="bg-slate-50 py-3 px-4 border-b border-slate-200 text-left font-bold text-slate-700 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i> สินค้าที่ถูก Reject บ่อยสุด</div>
+                                <ul class="divide-y divide-slate-100 text-left">
+                                    ${Object.entries(topRejectedItems).sort((a,b)=>b[1]-a[1]).slice(0,5).map(i => `
+                                        <li class="p-4 flex justify-between items-center hover:bg-slate-50">
+                                            <span class="text-sm font-bold text-indigo-600 truncate mr-4">${i[0]}</span>
+                                            <span class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">${i[1]} ครั้ง</span>
+                                        </li>
+                                    `).join('') || '<li class="p-8 text-center text-slate-400 italic">ไม่มีข้อมูล</li>'}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // ---------------------------------------------------------
+            // REPORT: AUDIT TRAIL
+            // ---------------------------------------------------------
+            else if (currentTab === 'auditlog' && isAdmin) {
+                const sDate = window.appState.reportAuditStartDate;
+                const eDate = window.appState.reportAuditEndDate;
+                const startTimestamp = new Date(sDate).setHours(0,0,0,0);
+                const endTimestamp = new Date(eDate).setHours(23,59,59,999);
+
+                const auditTrans = window.localData.transactions.filter(t => 
+                    (t.type === 'ADJUST' || t.status === 'VOIDED') &&
+                    (t.timestamp || 0) >= startTimestamp && 
+                    (t.timestamp || 0) <= endTimestamp
+                ).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+
+                const rows = auditTrans.map(t => {
+                    const isVoid = t.status === 'VOIDED';
+                    const badge = isVoid ? '<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[9px] font-bold border border-red-200">VOIDED</span>' 
+                                         : '<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[9px] font-bold border border-orange-200">ADJUST</span>';
+                    
+                    return `
+                        <tr class="border-b hover:bg-slate-50 text-center text-xs">
+                            <td class="py-3 px-3 text-slate-500 whitespace-nowrap">${t.date || '-'}</td>
+                            <td class="py-3 px-3">${badge}</td>
+                            <td class="py-3 px-3 font-mono font-bold text-indigo-600 text-left">${(t.item||'').split(' - ')[0] || '-'}</td>
+                            <td class="py-3 px-3 font-mono text-slate-500">${t.lot || '-'}</td>
+                            <td class="py-3 px-3 font-bold ${t.qty < 0 ? 'text-red-500' : 'text-emerald-500'} text-right">${t.qty > 0 ? '+'+t.qty : t.qty} ${t.unit||''}</td>
+                            <td class="py-3 px-3 text-slate-700 font-bold">${t.actionBy || '-'}</td>
+                            <td class="py-3 px-3 text-slate-600 text-left max-w-[200px] truncate" title="${t.note || '-'}">${t.note || '-'}</td>
+                            <td class="py-3 px-3 text-red-500 text-xs font-bold">${isVoid ? t.voidBy + '<br><span class="text-[9px] text-slate-400 font-normal">'+(t.voidAt||'-')+'</span>' : '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                adminContentHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-6xl mx-auto text-center">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                            <h3 class="text-lg font-bold text-slate-800 text-left"><i class="fas fa-shield-alt text-primary mr-2"></i> Audit Trail & Adjustment Log (ตรวจสอบทุจริตและการแก้ไข)</h3>
+                            <div class="flex gap-2 items-center mt-4 md:mt-0">
+                                <input type="date" value="${sDate}" onchange="window.appState.reportAuditStartDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm outline-none">
+                                <span class="text-slate-400">-</span>
+                                <input type="date" value="${eDate}" onchange="window.appState.reportAuditEndDate=this.value; window.refreshView();" class="border border-slate-200 rounded-lg p-2 text-sm outline-none">
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-xl">
+                            <table class="w-full text-sm text-left border-collapse min-w-[900px]">
+                                <thead class="bg-slate-100 border-b text-center text-slate-600 font-bold uppercase text-[10px]">
+                                    <tr>
+                                        <th class="py-3 px-3 border-b text-left">วันที่ทำรายการ</th>
+                                        <th class="py-3 px-3 border-b">Action</th>
+                                        <th class="py-3 px-3 border-b text-left">Item Code</th>
+                                        <th class="py-3 px-3 border-b">Lot No.</th>
+                                        <th class="py-3 px-3 border-b text-right">จำนวนที่เปลี่ยน</th>
+                                        <th class="py-3 px-3 border-b">ผู้ทำรายการต้นทาง</th>
+                                        <th class="py-3 px-3 border-b text-left">หมายเหตุ</th>
+                                        <th class="py-3 px-3 border-b">ผู้ทำการ Void (ถ้ามี)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows.length ? rows : '<tr><td colspan="8" class="text-center py-10 text-slate-400 italic"><i class="fas fa-check-circle text-emerald-400 mr-2"></i>ไม่มีรายการปรับปรุงหรือยกเลิกที่น่าสงสัยในช่วงเวลานี้</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (adminContentHTML) {
+                // Replace the <div class="fade-in">...</div> content dynamically
+                const injectPattern = /<div class="fade-in">([\s\S]*?)<\/div>\s*<\/div>\s*$/;
+                return baseHtml.replace(injectPattern, `<div class="fade-in">${adminContentHTML}</div></div>`);
+            }
+
+            return baseHtml;
+        };
+    </script>
+    </body>
+    </html>
