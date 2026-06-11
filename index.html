@@ -3520,21 +3520,34 @@
             // ---------------------------------------------------------
             // REPORT: LOT TRACEABILITY
             // ---------------------------------------------------------
-            if (currentTab === 'traceability' && isAdmin) {
-                const searchLot = window.appState.reportTraceLot.trim();
+                if (currentTab === 'traceability' && isAdmin) {
+                const searchLot = (window.appState.reportTraceLot || '').trim();
+                const searchCode = (window.appState.reportTraceCode || '').trim(); // ตัวแปร state ใหม่สำหรับรหัสสินค้า
                 let traceHTML = '';
                 
-                if (searchLot) {
-                    const traceTrans = window.localData.transactions.filter(t => t.lot === searchLot && t.status !== 'VOIDED').sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+                if (searchLot || searchCode) {
+                    const traceTrans = window.localData.transactions.filter(t => {
+                        if (t.status === 'VOIDED') return false;
+                        
+                        let match = true;
+                        // ถ้ามีการระบุ Lot ต้องตรงกัน
+                        if (searchLot && t.lot !== searchLot) match = false;
+                        // ถ้ามีการระบุ รหัสสินค้า ต้องมีคำนั้นอยู่ใน Code
+                        if (searchCode) {
+                            const itemCode = (t.item || '').split(' - ')[0] || '';
+                            if (!itemCode.toUpperCase().includes(searchCode.toUpperCase())) match = false;
+                        }
+                        return match;
+                    }).sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
                     
                     if (traceTrans.length > 0) {
                         const itemParts = (traceTrans[0].item || '').split(' - ');
                         traceHTML = `
                             <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-6 text-left flex justify-between items-center">
                                 <div>
-                                    <span class="text-xs font-bold text-indigo-500 uppercase block mb-1">Target Lot</span>
-                                    <h4 class="text-xl font-bold font-mono text-slate-800">${searchLot}</h4>
-                                    <p class="text-sm font-bold text-slate-600">${itemParts[0]} - ${itemParts.slice(1).join(' - ')}</p>
+                                    <span class="text-xs font-bold text-indigo-500 uppercase block mb-1">Target Lot / Item</span>
+                                    <h4 class="text-xl font-bold font-mono text-slate-800">${searchLot || 'ทุก Lot'} / ${searchCode || 'ทุกรหัสสินค้า'}</h4>
+                                    <p class="text-sm font-bold text-slate-600">${searchLot && !searchCode ? itemParts[0] + ' - ' + itemParts.slice(1).join(' - ') : 'Multiple Items/Lots'}</p>
                                 </div>
                                 <div class="text-right">
                                     <span class="text-xs font-bold text-slate-500 uppercase block mb-1">Total Activities</span>
@@ -3561,6 +3574,7 @@
                                             <span class="font-bold text-slate-800">${t.type}</span>
                                             <span class="text-xs font-mono text-slate-500">${t.date || '-'}</span>
                                         </div>
+                                        <div class="text-sm text-slate-600 mb-2">Item: <span class="font-bold text-indigo-600">${t.item || '-'}</span> | Lot: <span class="font-bold text-slate-800">${t.lot || '-'}</span></div>
                                         <div class="text-sm text-slate-600 mb-2">Action by: <span class="font-bold text-slate-800">${t.actionBy || '-'}</span></div>
                                         <div class="text-sm font-medium text-slate-700 bg-white/50 p-2 rounded border border-white/60">
                                             ${t.qty !== 0 ? `<span class="font-bold ${t.qty > 0 ? 'text-emerald-600' : 'text-red-500'}">${t.qty > 0 ? '+' : ''}${t.qty} ${t.unit}</span> | ` : ''} 
@@ -3572,18 +3586,19 @@
                         });
                         traceHTML += `</div>`;
                     } else {
-                        traceHTML = `<div class="p-10 text-center text-slate-400 italic">ไม่พบประวัติการทำรายการสำหรับ Lot: ${searchLot}</div>`;
+                        traceHTML = `<div class="p-10 text-center text-slate-400 italic">ไม่พบประวัติการทำรายการสำหรับข้อมูลที่ค้นหา</div>`;
                     }
                 }
 
                 adminContentHTML = `
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 max-w-4xl mx-auto">
-                        <h3 class="text-lg font-bold text-slate-800 mb-4 text-left"><i class="fas fa-search-location text-primary mr-2"></i> Lot Traceability (ตรวจสอบย้อนกลับ)</h3>
-                        <div class="flex gap-2 mb-6">
-                            <input type="text" id="trace-lot-input" value="${searchLot}" placeholder="กรอก Lot No. ที่ต้องการตรวจสอบย้อนกลับ (Exact Match)..." class="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none font-mono">
-                            <button onclick="window.appState.reportTraceLot = document.getElementById('trace-lot-input').value; window.refreshView();" class="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all"><i class="fas fa-search"></i> ค้นหา</button>
+                        <h3 class="text-lg font-bold text-slate-800 mb-4 text-left"><i class="fas fa-search-location text-primary mr-2"></i> Lot & Item Traceability (ตรวจสอบย้อนกลับ)</h3>
+                        <div class="flex flex-col sm:flex-row gap-2 mb-6">
+                            <input type="text" id="trace-code-input" value="${searchCode}" placeholder="รหัสสินค้า (Item Code)..." class="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none font-mono">
+                            <input type="text" id="trace-lot-input" value="${searchLot}" placeholder="Lot No. (Exact Match)..." class="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none font-mono">
+                            <button onclick="window.appState.reportTraceCode = document.getElementById('trace-code-input').value; window.appState.reportTraceLot = document.getElementById('trace-lot-input').value; window.refreshView();" class="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all"><i class="fas fa-search"></i> ค้นหา</button>
                         </div>
-                        ${searchLot ? traceHTML : '<div class="p-10 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">กรุณาระบุ Lot No. เพื่อเริ่มการตรวจสอบย้อนกลับ (Forward/Backward Traceability)</div>'}
+                        ${(searchLot || searchCode) ? traceHTML : '<div class="p-10 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">กรุณาระบุ Lot No. หรือ รหัสสินค้า เพื่อเริ่มการตรวจสอบย้อนกลับ</div>'}
                     </div>
                 `;
             }
