@@ -1221,6 +1221,8 @@
         window.executePrintBarcode = function() {
             const id = document.getElementById('print-barcode-id').value;
             const qty = parseInt(document.getElementById('print-barcode-qty').value) || 1;
+            const selectedLot = document.getElementById('print-barcode-lot').value; // ดึงค่า Lot ที่เลือก
+
             if (qty < 1) return window.alertError("จำนวนต้องมากกว่า 0");
             
             window.closeModal('print-barcode-modal');
@@ -1235,11 +1237,17 @@
             
             let labelsHTML = '';
             for (let i = 0; i < qty; i++) {
+                // ถ้าเลือก Lot ให้โชว์คำว่า Lot ลงไปบนฉลาก
+                const lotHtml = selectedLot ? `<div class="lot-text">Lot: ${selectedLot}</div>` : '';
+                // กำหนดค่าบาร์โค้ด (ยังคงสแกนเป็นรหัสสินค้าเหมือนเดิม เพื่อให้เข้ากับระบบค้นหา)
+                const barcodeData = item.code || ''; 
+
                 labelsHTML += `
                     <div class="label">
                         <div class="sku">${item.code||''}</div>
                         <div class="name">${item.name||''}</div>
-                        <svg class="barcode-target" data-code="${item.code||''}"></svg>
+                        ${lotHtml}
+                        <svg class="barcode-target" data-code="${barcodeData}"></svg>
                     <div class="qc-box">
                         <div class="qc-item"><div class="box"></div> <span>PASS</span> (ผ่าน)</div>
                         <div class="qc-item"><div class="box"></div> <span>REJECT</span> (ไม่ผ่าน)</div>
@@ -1291,11 +1299,21 @@
                             font-size: 12px; 
                             font-weight: 700; 
                             text-align: center; 
-                            margin-bottom: 2px; 
+                            margin-bottom: 0px; 
                             overflow: hidden; 
                             text-overflow: ellipsis; 
                             white-space: nowrap; 
                             max-width: 100%; 
+                        }
+                        .lot-text {
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: #333;
+                            background-color: #eee;
+                            padding: 1px 6px;
+                            border-radius: 4px;
+                            margin-bottom: 2px;
+                            font-family: monospace;
                         }
                         svg { 
                             max-width: 100%; 
