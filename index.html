@@ -3513,7 +3513,7 @@
             let baseHtml = originalRenderReports.apply(this);
             
             // Inject the buttons into the base HTML
-            baseHtml = baseHtml.replace('</div>\n            <div class="fade-in">', `</div>${adminTabButtons}<div class="fade-in">`);
+            baseHtml = baseHtml.replace(/<\/div>[\s\n]*<div class="fade-in">/, `</div>\n${adminTabButtons}\n<div class="fade-in">`);
 
             let adminContentHTML = '';
 
