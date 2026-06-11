@@ -1200,6 +1200,21 @@
             document.getElementById('print-barcode-code').innerText = item.code || '';
             document.getElementById('print-barcode-name').innerText = item.name || '';
             document.getElementById('print-barcode-qty').value = 1;
+
+            // --- ดึงข้อมูล Lot ที่มีในสต็อกมาแสดงให้เลือก ---
+            const lotSelect = document.getElementById('print-barcode-lot');
+            const activeStocks = window.localData.stock.filter(s => String(s.itemId) === String(id) && s.qty > 0);
+            
+            // กรองเอาแค่ Lot No. ที่ไม่ซ้ำกัน
+            const uniqueLots = [...new Set(activeStocks.map(s => s.lotNo))];
+            
+            let lotOptions = '<option value="">-- ไม่ระบุ Lot --</option>';
+            uniqueLots.forEach(lot => {
+                lotOptions += `<option value="${lot}">${lot}</option>`;
+            });
+            lotSelect.innerHTML = lotOptions;
+            // ------------------------------------------
+
             document.getElementById('print-barcode-modal').classList.remove('hidden');
         };
 
