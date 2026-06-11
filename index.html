@@ -3658,6 +3658,18 @@
                         ${(searchLot || searchItemId) ? traceHTML : '<div class="p-10 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">กรุณาเลือก "รหัสสินค้า" หรือระบุ "Lot No." เพื่อเริ่มการค้นหา</div>'}
                     </div>
                 `;
+                
+                // สคริปต์เสริมเพื่อดึงชื่อที่เลือกกลับมาใส่ในช่องค้นหาตอน Refresh
+                if (searchItemId && targetItemName !== 'ทุกรหัสสินค้า') {
+                    setTimeout(() => {
+                        const input = document.getElementById('search-input-trace-item');
+                        const hidden = document.getElementById('hidden-item-id-trace-item');
+                        const clearBtn = document.getElementById('clear-btn-trace-item');
+                        if (input) input.value = targetItemName;
+                        if (hidden) hidden.value = searchItemId;
+                        if (clearBtn) clearBtn.classList.remove('hidden');
+                    }, 50);
+                }
             }
             // ---------------------------------------------------------
             // REPORT: STOCK CARD (BIN CARD)
