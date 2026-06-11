@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.31 (Universal Report Access & Audit Logs) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.31</title>
+    <!-- Version Updated: v6.32 (Universal Report Access & Audit Logs) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.32</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,7 +123,7 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.31</span></h1>
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.32</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -564,11 +564,11 @@
             reportWithdrawalStartDate: todayStr, reportWithdrawalEndDate: todayStr, reportWithdrawalSearch: ''
         };
 
-        // V6.31 Update: Added reports to QC menu
+        // V6.32 Update: Report Universal Access for all roles
         const menuConfig = {
             ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
             STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}],
-            QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}]
+            QC: [{id:'qc-task',l:'งานรอตรวจ',i:'fa-clipboard-check'},{id:'dashboard',l:'ดูสต็อก',i:'fa-search'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'}, {id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}]
         };
 
         window.checkPerm = function(act) { 
@@ -1899,7 +1899,7 @@
         };
 
         // --- EXPORT/PRINT HANDLERS ---
-        // V6.31 Update: Removed isAdmin restriction from export & added audit log
+        // V6.32 Update: Explicitly allowed for all roles via Report Access
         window.exportWithdrawalExcel = async function() {
             const startDate = document.getElementById('withdrawal-start-date').value;
             const endDate = document.getElementById('withdrawal-end-date').value;
@@ -1928,7 +1928,7 @@
             window.alertSuccess('ส่งออกไฟล์ Excel สำเร็จ และบันทึกประวัติ (Audit Log) เรียบร้อยแล้ว');
         };
 
-        // V6.31 Update: Removed isAdmin restriction from print & added audit log
+        // V6.32 Update: Explicitly allowed for all roles via Report Access
         window.printWithdrawalReport = async function() {
             const startDate = document.getElementById('withdrawal-start-date').value;
             const endDate = document.getElementById('withdrawal-end-date').value;
@@ -1996,11 +1996,26 @@
             window.location.hash = viewId;
             const user = window.appState.currentUser;
             if(!user) return;
-            document.getElementById('menu-list').innerHTML = (menuConfig[user.role]||[]).map(m => `<li onclick="window.renderView('${m.id}')" class="nav-item ${viewId===m.id?'active':''} group flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 mx-2 text-slate-300 hover:text-white"><i class="fas ${m.i} w-6 text-center text-lg"></i><span class="font-medium text-sm">${m.l}</span></li>`).join('');
+            
+            // --- Additive Patch: Universal Report Access ---
+            let userMenu = menuConfig[user.role];
+            if (!userMenu) {
+                // Fallback for unknown/new roles
+                userMenu = [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'}];
+            }
+            // Ensure 'reports' is always present for EVERY role seamlessly
+            if (!userMenu.find(m => m.id === 'reports')) {
+                userMenu = [...userMenu, {id:'reports',l:'รายงาน',i:'fa-file-lines'}];
+            }
+            // ---------------------------------------------
+
+            document.getElementById('menu-list').innerHTML = userMenu.map(m => `<li onclick="window.renderView('${m.id}')" class="nav-item ${viewId===m.id?'active':''} group flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 mx-2 text-slate-300 hover:text-white"><i class="fas ${m.i} w-6 text-center text-lg"></i><span class="font-medium text-sm">${m.l}</span></li>`).join('');
+            
             document.getElementById('current-user-role').innerText = user.role;
             document.getElementById('current-user-name').innerText = user.name;
             document.getElementById('topbar-user-name').innerText = user.name;
             document.getElementById('topbar-user-role').innerText = user.role;
+            
             const content = document.getElementById('content-area');
             if(viewId==='dashboard') content.innerHTML=renderDashboard();
             else if(viewId==='inventory-status') content.innerHTML=renderInventoryStatus();
@@ -2092,6 +2107,66 @@
                         </tbody></table></div>
                     </div>
                 </div>`;
+        }
+
+        // Additive Patch: Adding the Missing History Renderer
+        function renderHistory() {
+            const list = window.localData.transactions.map(t => {
+                const badgeColor = t.type.includes('REC') ? 'bg-emerald-100 text-emerald-700' :
+                                   t.type.includes('ISS') ? 'bg-indigo-100 text-indigo-700' :
+                                   t.type === 'ADJUST' ? 'bg-blue-100 text-blue-700' :
+                                   t.type.includes('REPORT') ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700';
+                const statusBadge = t.status === 'VOIDED' ? '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold">VOIDED</span>' : '<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVE</span>';
+                const qtyStr = t.qty > 0 ? `+${t.qty.toFixed(2)}` : t.qty.toFixed(2);
+                const qtyColor = t.qty > 0 ? 'text-emerald-600' : (t.qty < 0 ? 'text-red-500' : 'text-slate-500');
+                
+                const voidBtn = (window.appState.currentUser.role === 'ADMIN' && t.status !== 'VOIDED' && t.type !== 'EXPORT_REPORT' && t.type !== 'PRINT_REPORT')
+                    ? `<button onclick="window.voidTransaction('${t.id}')" class="text-slate-400 hover:text-orange-500 p-1.5 rounded transition-colors" title="ยกเลิกรายการ (Void)"><i class="fas fa-ban"></i></button>` : '';
+                const delBtn = (window.appState.currentUser.role === 'ADMIN')
+                    ? `<button onclick="window.deleteTransaction('${t.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded transition-colors" title="ลบถาวร"><i class="fas fa-trash-alt"></i></button>` : '';
+
+                return `<tr class="border-b hover:bg-slate-50 text-xs text-center ${t.status === 'VOIDED' ? 'opacity-50' : ''}">
+                    <td class="p-3 text-left font-mono text-slate-500">${t.date || '-'}</td>
+                    <td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${badgeColor}">${t.type}</span></td>
+                    <td class="p-3 text-left font-bold text-indigo-600">${(t.item || '').split(' - ')[0] || '-'}</td>
+                    <td class="p-3 font-mono text-slate-600">${t.lot || '-'}</td>
+                    <td class="p-3 font-bold ${qtyColor}">${qtyStr}</td>
+                    <td class="p-3 text-[10px] uppercase text-slate-500">${t.unit || '-'}</td>
+                    <td class="p-3 text-left truncate max-w-[150px] text-slate-600" title="${t.note || '-'}">${t.note || '-'}</td>
+                    <td class="p-3 text-slate-700">${t.actionBy || '-'}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3">
+                        <div class="flex justify-center gap-1">${voidBtn}${delBtn}</div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            return `<div class="max-w-7xl mx-auto text-center">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-clock-rotate-left text-primary mr-3"></i> ประวัติการทำรายการ (Transaction History)</h3>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto max-h-[700px] custom-scrollbar">
+                        <table class="w-full text-sm text-left border-collapse min-w-[1000px]">
+                            <thead class="bg-slate-50/80 sticky top-0 z-10 backdrop-blur border-b text-center text-slate-500 font-bold uppercase text-[11px]">
+                                <tr>
+                                    <th class="p-3 border-b text-left">วัน-เวลา</th>
+                                    <th class="p-3 border-b">ประเภท</th>
+                                    <th class="p-3 border-b text-left">รหัสสินค้า</th>
+                                    <th class="p-3 border-b">Lot No.</th>
+                                    <th class="p-3 border-b">จำนวน</th>
+                                    <th class="p-3 border-b">หน่วย</th>
+                                    <th class="p-3 border-b text-left">หมายเหตุ / Ref</th>
+                                    <th class="p-3 border-b">ผู้ดำเนินการ</th>
+                                    <th class="p-3 border-b">สถานะ</th>
+                                    <th class="p-3 border-b">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody>${list.length ? list : '<tr><td colspan="10" class="p-16 text-center text-slate-400 italic font-medium">ยังไม่มีประวัติรายการ</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
         }
 
         function renderReports() {
@@ -2356,7 +2431,7 @@
                 `;
             }
             
-            // 6. DAILY WITHDRAWAL REPORT (UPDATE: UNLOCKED FOR ALL ROLES)
+            // 6. DAILY WITHDRAWAL REPORT
             else if (currentTab === 'withdrawal') {
                 const sDate = window.appState.reportWithdrawalStartDate;
                 const eDate = window.appState.reportWithdrawalEndDate;
