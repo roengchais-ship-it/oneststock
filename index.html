@@ -1096,7 +1096,11 @@
                 if(batch) {
                     await batch.commit();
                 }
-
+// AUTO-SYNC HOOK: ป้องกันยอดคลาดเคลื่อนหลังเบิก
+for(let c of window.appState.issueCart) {
+    let lots = window.localData.stock.filter(s=>String(s.itemId)===String(c.itemId));
+    for (let l of lots) { await window.syncStockBalance(l.id); }
+}
                 window.appState.issueCart=[]; window.appState.issueRefDoc=''; 
                 window.appState.issueRemarkId=''; window.appState.issueRemarkCustom='';
                 window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
