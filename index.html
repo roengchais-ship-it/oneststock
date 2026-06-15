@@ -564,6 +564,7 @@
         const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
         window.appState = window.appState || { 
             currentUser: null, currentView: 'dashboard', issueCart: [], issueRefDoc: '', issueDate: '',
+            countCart: [], countRef: '', // <-- เพิ่มบรรทัดนี้
             issueRemarkId: '', issueRemarkCustom: '',
             inventoryFilter: 'ALL', inventoryLowStockOnly: false, inventoryExpiringSoonOnly: false,
             receiveHistoryFilterDate: '', itemMasterSearch: '', itemMasterPage: 1, qcTab: 'PENDING',
