@@ -2420,12 +2420,11 @@ for(let c of window.appState.issueCart) {
             else if(viewId==='receive') content.innerHTML=renderReceiveForm();
             else if(viewId==='qc-task') content.innerHTML=renderQCTask();
             else if(viewId==='issue') content.innerHTML=renderIssueForm();
-            else if(viewId==='stock-count') content.innerHTML=renderStockCount(); // <-- เปิดหน้าตรวจนับสต็อก
+            else if(viewId==='stock-count') content.innerHTML=renderStockCount();
             else if(viewId==='history') content.innerHTML=renderHistory();
             else if(viewId==='reports') content.innerHTML=renderReports(); 
             else if(viewId==='user-list') content.innerHTML=renderUserList();
         };
-
         window.refreshView = () => {
             if(window.appState && window.appState.currentView) {
                 const activeEl = document.activeElement;
