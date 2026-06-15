@@ -2392,18 +2392,15 @@ for(let c of window.appState.issueCart) {
                 window.showToast('Access Denied: สิทธิ์เฉพาะ Admin เท่านั้น', 'error');
                 return window.renderView('dashboard');
             }
+
             window.appState.currentView = viewId;
             window.location.hash = viewId;
-            const user = window.appState.currentUser;
-            if(!user) return;
             
             // --- Additive Patch: Universal Report Access ---
             let userMenu = menuConfig[user.role];
             if (!userMenu) {
-                // Fallback for unknown/new roles
                 userMenu = [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'}];
             }
-            // Ensure 'reports' is always present for EVERY role seamlessly
             if (!userMenu.find(m => m.id === 'reports')) {
                 userMenu = [...userMenu, {id:'reports',l:'รายงาน',i:'fa-file-lines'}];
             }
@@ -2418,19 +2415,12 @@ for(let c of window.appState.issueCart) {
             
             const content = document.getElementById('content-area');
             if(viewId==='dashboard') content.innerHTML=renderDashboard();
-            const user = window.appState.currentUser;
-            if(!user) return;
-            
-            // --- ROUTE GUARD FOR STOCK COUNT ---
-            if (viewId === 'stock-count' && user.role !== 'ADMIN') {
-                window.showToast('Access Denied: สิทธิ์เฉพาะ Admin เท่านั้น', 'error');
-                return window.renderView('dashboard');
-            }
             else if(viewId==='inventory-status') content.innerHTML=renderInventoryStatus();
             else if(viewId==='item-master') content.innerHTML=renderItemMaster();
             else if(viewId==='receive') content.innerHTML=renderReceiveForm();
             else if(viewId==='qc-task') content.innerHTML=renderQCTask();
             else if(viewId==='issue') content.innerHTML=renderIssueForm();
+            else if(viewId==='stock-count') content.innerHTML=renderStockCount(); // <-- เปิดหน้าตรวจนับสต็อก
             else if(viewId==='history') content.innerHTML=renderHistory();
             else if(viewId==='reports') content.innerHTML=renderReports(); 
             else if(viewId==='user-list') content.innerHTML=renderUserList();
