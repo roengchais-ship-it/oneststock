@@ -1107,7 +1107,122 @@ for(let c of window.appState.issueCart) {
                 window.alertSuccess('เบิกสำเร็จ'); window.renderView('dashboard'); 
             } catch(e){window.alertError(e.message)} 
         };
+        // ==========================================
+        // STOCK COUNT LOGIC
+        // ==========================================
+        window.updateCountLotDropdown = function(itemId) {
+            const lotSelect = document.getElementById('input-count-lot-no');
+            const sysQtyInput = document.getElementById('input-count-sys-qty');
+            if (!lotSelect || !sysQtyInput) return;
+            sysQtyInput.value = '';
 
+            if (!itemId) { lotSelect.innerHTML = '<option value="">-- เลือกสินค้าก่อน --</option>'; return; }
+            const item = window.localData.items.find(x => String(x.id) === String(itemId));
+            if(!item) return;
+
+            const availableLots = window.localData.stock.filter(s => String(s.itemId) === String(itemId) && s.qty > 0);
+            if (availableLots.length === 0) { lotSelect.innerHTML = '<option value="">-- ไม่มีสต็อกในระบบ --</option>'; return; }
+
+            let opts = '<option value="">-- เลือกล็อต --</option>';
+            availableLots.forEach(s => {
+                opts += `<option value="${s.id}" data-qty="${s.qty}">${s.lotNo} (มี ${s.qty.toLocaleString()} ${item.unit}) - โซน: ${s.location}</option>`;
+            });
+            lotSelect.innerHTML = opts;
+        };
+
+        window.handleCountLotChange = function(selectEl) {
+            const sysQtyInput = document.getElementById('input-count-sys-qty');
+            if (!sysQtyInput) return;
+            const selectedOption = selectEl.options[selectEl.selectedIndex];
+            if (selectedOption && selectedOption.value !== "") {
+                sysQtyInput.value = selectedOption.getAttribute('data-qty');
+            } else {
+                sysQtyInput.value = '';
+            }
+        };
+
+        window.handleAddCountItem = () => {
+            const itemId = document.getElementById('hidden-item-id-count-item').value;
+            const stockId = document.getElementById('input-count-lot-no').value;
+            const countQtyInput = document.getElementById('input-count-qty').value;
+            const countQty = parseFloat(countQtyInput);
+
+            if(!itemId || !stockId || isNaN(countQty) || countQty < 0) return window.alertError("กรุณากรอกข้อมูลและจำนวนที่นับได้ต้องไม่ติดลบ");
+
+            const item = window.localData.items.find(x => String(x.id) === String(itemId));
+            const stock = window.localData.stock.find(x => x.id === stockId);
+            if(!item || !stock) return;
+
+            if (window.appState.countCart.some(c => c.stockId === stockId)) {
+                return window.alertError("Lot นี้ถูกเพิ่มในรายการตรวจนับแล้ว");
+            }
+
+            const sysQty = stock.qty;
+            const diff = countQty - sysQty;
+
+            window.appState.countCart.push({ itemId, item, stockId, stock, sysQty, countQty, diff, unit: item.unit });
+
+            document.getElementById('input-count-qty').value = '';
+            window.clearSelection('count-item');
+            document.getElementById('input-count-sys-qty').value = '';
+            window.refreshView();
+        };
+
+        window.removeCountItem = (idx) => {
+            window.appState.countCart.splice(idx, 1);
+            window.refreshView();
+        };
+
+        window.processStockCountBatch = async () => {
+            if(!window.appState.countCart.length || !window.appState.countRef) return window.alertError('กรุณาระบุ Session Ref และเพิ่มรายการนับ');
+            if(window.appState.currentUser.role !== 'ADMIN') return window.alertError('เฉพาะ Admin เท่านั้น');
+
+            window.confirmAction('ยืนยันผลการตรวจนับ?\nระบบจะสร้าง Auto-Adjustment สำหรับรายการที่มีผลต่าง (Diff)', async () => {
+                try {
+                    const batch = (window.db_writeBatch && window.db) ? window.db_writeBatch(window.db) : null;
+                    const now = Date.now();
+                    const dateStr = new Date().toLocaleString('th-TH');
+
+                    for(let c of window.appState.countCart) {
+                        // ป้องกัน Race Condition ระหว่างนับ ดึงยอดล่าสุดจาก DB ใหม่
+                        const currentStock = window.localData.stock.find(s => s.id === c.stockId);
+                        if (!currentStock) continue;
+
+                        const realSysQty = currentStock.qty;
+                        const realDiff = c.countQty - realSysQty;
+
+                        // ถ้ามีผลต่าง สร้าง Transaction แบบ ADJUST
+                        if (realDiff !== 0) {
+                            const note = `[STOCK_COUNT] Ref: ${window.appState.countRef} | Sys: ${realSysQty} -> Count: ${c.countQty}`;
+
+                            if (batch) {
+                                const stockRef = window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, c.stockId);
+                                batch.update(stockRef, { qty: c.countQty });
+
+                                const transRef = window.db_doc(window.db_collection(window.db, `artifacts/${window.appId}/public/data/transactions`));
+                                batch.set(transRef, {
+                                    type: 'ADJUST', itemId: c.itemId, item: `${c.item.code} - ${c.item.name}`, lot: currentStock.lotNo, qty: realDiff,
+                                    unit: c.unit, actionBy: window.appState.currentUser.name, note: note,
+                                    date: dateStr, timestamp: now, status: 'ACTIVE', stockId: c.stockId
+                                });
+                            } else {
+                                currentStock.qty = c.countQty;
+                                await window.logTrans('ADJUST', c.itemId, currentStock.lotNo, realDiff, c.unit, note, null, c.stockId);
+                            }
+                        }
+                    }
+
+                    if(batch) await batch.commit();
+
+                    // เรียกใช้ Auto Reconciliation Sync ยอดให้ตรงกับ Stock Card
+                    for(let c of window.appState.countCart) { await window.syncStockBalance(c.stockId); }
+
+                    window.appState.countCart = []; window.appState.countRef = '';
+                    window.alertSuccess('บันทึกผลการตรวจนับ และปรับปรุงยอดสำเร็จ');
+                    window.renderView('dashboard');
+                } catch(e) { window.alertError(e.message); }
+            });
+        };
         window.voidTransaction = function(id) {
             const trans = window.localData.transactions.find(t => t.id === id);
             if (!trans || trans.status === 'VOIDED') return;
