@@ -587,7 +587,68 @@
         };
 
         window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
+// --- AUTO RECONCILIATION & SYNC TOOL (V6.35) ---
+        window.syncStockBalance = async function(stockId) {
+            if (!stockId) return;
+            try {
+                const stockDoc = window.localData.stock.find(s => s.id === stockId);
+                if (!stockDoc) return;
 
+                const relatedTrans = window.localData.transactions.filter(t => 
+                    t.status !== 'VOIDED' && t.stockId === stockId && 
+                    ['RECEIVE', 'ISSUE', 'ADJUST'].includes(t.type)
+                );
+
+                let trueQty = 0;
+                relatedTrans.forEach(t => { trueQty += parseFloat(t.qty || 0); });
+                trueQty = parseFloat(trueQty.toFixed(4)); 
+                const currentQty = parseFloat(stockDoc.qty.toFixed(4));
+
+                if (Math.abs(currentQty - trueQty) > 0.0001) {
+                    console.warn(`[Auto-Reconcile] Stock ID: ${stockId} Mismatch! Current: ${currentQty}, True: ${trueQty}`);
+                    if (window.db_updateDoc && window.db_doc && window.db && window.appId) {
+                        await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockId), { qty: trueQty });
+                    } else { stockDoc.qty = trueQty; }
+                }
+            } catch (e) { console.error("[Sync Error]", e); }
+        };
+
+        window.reconcileAllStocks = async function() {
+            if (!window.appState.currentUser || window.appState.currentUser.role !== 'ADMIN') return window.alertError('สิทธิ์ Admin เท่านั้น');
+
+            window.confirmAction('ยืนยันการ Reconcile ยอดสต็อก?\nระบบจะคำนวณยอดคงเหลือใหม่ทั้งหมด จากประวัติ Stock Card เพื่อแก้ปัญหายอดเพี้ยน', async () => {
+                document.getElementById('loading-screen').classList.remove('hidden');
+                document.getElementById('loading-text').innerText = "กำลังคำนวณ Running Balance ใหม่ทั้งหมด...";
+                let updatedCount = 0;
+
+                try {
+                    const batch = (window.db_writeBatch && window.db) ? window.db_writeBatch(window.db) : null;
+                    for (let s of window.localData.stock) {
+                        const relatedTrans = window.localData.transactions.filter(t => 
+                            t.status !== 'VOIDED' && t.stockId === s.id && ['RECEIVE', 'ISSUE', 'ADJUST'].includes(t.type)
+                        );
+                        let trueQty = 0;
+                        relatedTrans.forEach(t => { trueQty += parseFloat(t.qty || 0); });
+                        trueQty = parseFloat(trueQty.toFixed(4));
+                        const currentQty = parseFloat((s.qty || 0).toFixed(4));
+
+                        if (Math.abs(currentQty - trueQty) > 0.0001) {
+                            if (batch) {
+                                const stockRef = window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, s.id);
+                                batch.update(stockRef, { qty: trueQty });
+                            } else { s.qty = trueQty; }
+                            updatedCount++;
+                        }
+                    }
+                    if (batch && updatedCount > 0) await batch.commit();
+                    window.alertSuccess(`Reconcile สำเร็จ!\nซิงค์ยอดให้ตรงกับ Stock Card จำนวน ${updatedCount} รายการ`);
+                } catch (e) { window.alertError('Reconcile Error: ' + e.message); } 
+                finally {
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    window.refreshView();
+                }
+            });
+        };
         window.runAutoRecovery = async () => {
             if (!window.db_setDoc || !window.appId || !window.localData.items.length) return;
             const orphanedStocks = window.localData.stock.filter(s => s.qty > 0 && !window.localData.items.find(i => String(i.id) === String(s.itemId)));
