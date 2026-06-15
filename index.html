@@ -1143,6 +1143,7 @@ for(let c of window.appState.issueCart) {
                     } else {
                         trans.status = 'VOIDED'; trans.voidBy = window.appState.currentUser.name; trans.voidAt = new Date().toLocaleString('th-TH');
                     }
+                    if (stockDoc) await window.syncStockBalance(stockDoc.id);
                     window.alertSuccess('ยกเลิกรายการและคืนสต็อกสำเร็จ'); window.renderView('history');
                 } catch (e) { window.alertError("Void Error: " + e.message); }
             });
