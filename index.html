@@ -2269,6 +2269,14 @@ for(let c of window.appState.issueCart) {
     <!-- SCRIPT 2: RENDERERS (VIEWS) -->
     <script>
         window.renderView = (viewId) => {
+            const user = window.appState.currentUser;
+            if(!user) return;
+            
+            // --- ROUTE GUARD FOR STOCK COUNT ---
+            if (viewId === 'stock-count' && user.role !== 'ADMIN') {
+                window.showToast('Access Denied: สิทธิ์เฉพาะ Admin เท่านั้น', 'error');
+                return window.renderView('dashboard');
+            }
             window.appState.currentView = viewId;
             window.location.hash = viewId;
             const user = window.appState.currentUser;
@@ -2295,6 +2303,14 @@ for(let c of window.appState.issueCart) {
             
             const content = document.getElementById('content-area');
             if(viewId==='dashboard') content.innerHTML=renderDashboard();
+            const user = window.appState.currentUser;
+            if(!user) return;
+            
+            // --- ROUTE GUARD FOR STOCK COUNT ---
+            if (viewId === 'stock-count' && user.role !== 'ADMIN') {
+                window.showToast('Access Denied: สิทธิ์เฉพาะ Admin เท่านั้น', 'error');
+                return window.renderView('dashboard');
+            }
             else if(viewId==='inventory-status') content.innerHTML=renderInventoryStatus();
             else if(viewId==='item-master') content.innerHTML=renderItemMaster();
             else if(viewId==='receive') content.innerHTML=renderReceiveForm();
