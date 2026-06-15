@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Version Updated: v6.33 (Daily Stock Movement Report) -->
-    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.33</title>
+    <!-- Version Updated: v6.34 (Fixed Stock Balance Mismatch & Added Reconciliation Tool) -->
+    <title>ระบบบริหารจัดการสต็อก (Onest stock) v6.34</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
@@ -123,7 +123,7 @@
                     <i class="fas fa-cubes"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.33</span></h1>
+                    <h1 class="font-bold text-lg tracking-tight flex items-center gap-1">Onest stock <span class="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded-md text-slate-300">v6.34</span></h1>
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider"><i class="fas fa-wifi mr-1"></i> Online</p>
                 </div>
             </div>
@@ -573,7 +573,7 @@
             reportMovementStartDate: todayStr, reportMovementEndDate: todayStr, reportMovementSearch: '' // ADDED FOR MOVEMENT REPORT
         };
 
-        // V6.33 Update: Report Universal Access for all roles + New Report
+        // V6.34 Update: Report Universal Access for all roles + New Report
         const menuConfig = {
             ADMIN: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'qc-task',l:'ตรวจ QC',i:'fa-clipboard-check'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}, {id:'user-list',l:'จัดการผู้ใช้',i:'fa-users-cog'}],
             STOCK: [{id:'dashboard',l:'ภาพรวม',i:'fa-chart-pie'},{id:'inventory-status',l:'ยอดคงเหลือ',i:'fa-boxes-stacked'},{id:'item-master',l:'ข้อมูลสินค้า',i:'fa-box'},{id:'receive',l:'รับของเข้า',i:'fa-dolly'},{id:'issue',l:'เบิกจ่าย',i:'fa-truck-fast'},{id:'history',l:'ประวัติ',i:'fa-clock-rotate-left'}, {id:'reports',l:'รายงาน',i:'fa-file-lines'}],
@@ -1063,6 +1063,14 @@
                             if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockDoc.id), { qty: stockDoc.qty + Math.abs(trans.qty) });
                             else stockDoc.qty += Math.abs(trans.qty);
                         } else { return window.alertError("ไม่พบข้อมูล Lot เดิมในระบบ ไม่สามารถคืนค่าสต็อกได้"); }
+                    } else if (trans.type === 'ADJUST') {
+                        // V6.34: ADDED ADJUST VOID LOGIC
+                        if (stockDoc) {
+                            // If ADJUST was +20 (trans.qty = 20), reverse is -20. If ADJUST was -20, reverse is +20.
+                            const newQty = Math.max(0, stockDoc.qty - trans.qty);
+                            if(window.db_updateDoc && window.db_doc && window.db && window.appId) await window.db_updateDoc(window.db_doc(window.db, `artifacts/${window.appId}/public/data/stock`, stockDoc.id), { qty: newQty });
+                            else stockDoc.qty = newQty;
+                        }
                     }
 
                     if(window.db_updateDoc && window.db_doc && window.db && window.appId) {
@@ -3561,7 +3569,7 @@
             // ---------------------------------------------------------
             // REPORT: LOT TRACEABILITY
             // ---------------------------------------------------------
-                if (currentTab === 'traceability' && isAdmin) {
+            if (currentTab === 'traceability' && isAdmin) {
                 const searchLot = (window.appState.reportTraceLot || '').trim();
                 const searchItemId = window.appState.reportTraceItemId || ''; 
                 let traceHTML = '';
