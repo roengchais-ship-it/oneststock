@@ -453,6 +453,12 @@
                     </select>
                 </div>
 
+                <!-- แทรกช่องกรอกปริมาณบรรจุตรงนี้ -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">ปริมาณ/จำนวนบรรจุ (แสดงบนฉลาก)</label>
+                    <input type="text" id="print-label-amount" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-center text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400 outline-none" placeholder="เช่น 10 kg, 50 pcs (เว้นว่างได้)">
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">จำนวนดวงที่ต้องการพิมพ์</label>
                     <input type="number" id="print-barcode-qty" class="w-full border-2 border-slate-200 rounded-xl px-3 py-3 text-center text-2xl font-bold text-slate-700 focus:border-indigo-400 outline-none" min="1" value="1">
@@ -1383,13 +1389,17 @@ for(let c of window.appState.issueCart) {
             lotSelect.innerHTML = opts;
         };
 
-        window.openPrintBarcodeModal = function(id) {
+       window.openPrintBarcodeModal = function(id) {
             const item = window.localData.items.find(x => String(x.id) === String(id));
             if (!item) return;
             document.getElementById('print-barcode-id').value = id;
             document.getElementById('print-barcode-code').innerText = item.code || '';
             document.getElementById('print-barcode-name').innerText = item.name || '';
             document.getElementById('print-barcode-qty').value = 1;
+            
+            // ล้างค่าช่องปริมาณบรรจุเมื่อเปิดหน้าต่างใหม่
+            const labelAmountEl = document.getElementById('print-label-amount');
+            if (labelAmountEl) labelAmountEl.value = '';
 
             // --- ดึงข้อมูล Lot ที่มีในสต็อกมาแสดงให้เลือก ---
             const lotSelect = document.getElementById('print-barcode-lot');
@@ -1412,6 +1422,9 @@ for(let c of window.appState.issueCart) {
             const id = document.getElementById('print-barcode-id').value;
             const qty = parseInt(document.getElementById('print-barcode-qty').value) || 1;
             const selectedLot = document.getElementById('print-barcode-lot').value; // ดึงค่า Lot ที่เลือก
+            
+            // ดึงค่าปริมาณบรรจุที่ผู้ใช้กรอก
+            const labelAmount = document.getElementById('print-label-amount').value.trim();
 
             if (qty < 1) return window.alertError("จำนวนต้องมากกว่า 0");
             
@@ -1429,6 +1442,10 @@ for(let c of window.appState.issueCart) {
             for (let i = 0; i < qty; i++) {
                 // ถ้าเลือก Lot ให้โชว์คำว่า Lot ลงไปบนฉลาก
                 const lotHtml = selectedLot ? `<div class="lot-text">Lot: ${selectedLot}</div>` : '';
+                
+                // สร้าง HTML แสดงปริมาณบรรจุถ้ามีการกรอก
+                const amountHtml = labelAmount ? `<div class="amount-text">บรรจุ: ${labelAmount}</div>` : '';
+                
                 // กำหนดค่าบาร์โค้ด (ยังคงสแกนเป็นรหัสสินค้าเหมือนเดิม เพื่อให้เข้ากับระบบค้นหา)
                 const barcodeData = item.code || ''; 
 
@@ -1437,6 +1454,7 @@ for(let c of window.appState.issueCart) {
                         <div class="sku">${item.code||''}</div>
                         <div class="name">${item.name||''}</div>
                         ${lotHtml}
+                        ${amountHtml}
                         <svg class="barcode-target" data-code="${barcodeData}"></svg>
                     <div class="qc-box">
                         <div class="qc-item"><div class="box"></div> <span>PASS</span> (ผ่าน)</div>
@@ -1504,6 +1522,15 @@ for(let c of window.appState.issueCart) {
                             line-height: 1;
                             font-family: 'Sarabun', sans-serif;
                             /* เอาพื้นหลังสีเทาออกเพื่อให้ดูสะอาดตากลมกลืนกับรหัส */
+                        }
+                        .amount-text {
+                            font-size: 16px;
+                            font-weight: 700;
+                            color: #333;
+                            text-align: center;
+                            margin-bottom: 2px;
+                            line-height: 1.2;
+                            font-family: 'Sarabun', sans-serif;
                         }
                         svg { 
                             max-width: 100%; 
